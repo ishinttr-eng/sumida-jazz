@@ -639,6 +639,7 @@ function drawMapLayer(date, min) {
       zIndexOffset: isStamp ? 200 : 0,
     }).addTo(layer);
     let popupHtml = `<b>${v.stageNo}. ${v.name}</b>`;
+    popupHtml += `<br><button data-tt="${v.id}" style="margin-top:6px">📅 タイムテーブルを見る</button>`;
     if (ui.mapMode === "stamp") {
       const visited = store.state.stamps.has(v.id);
       popupHtml += `<br><button data-stamp="${v.id}" style="margin-top:6px">${visited ? "✓ 訪問済み" : "訪問済みにする"}</button>`;
@@ -647,6 +648,12 @@ function drawMapLayer(date, min) {
     popupHtml += `<br><a href="${gmaps}" target="_blank" rel="noopener">Googleマップで徒歩ナビ</a>`;
     marker.bindPopup(popupHtml);
     marker.on("popupopen", () => {
+      const ttBtn = document.querySelector(`[data-tt="${v.id}"]`);
+      if (ttBtn) ttBtn.addEventListener("click", () => {
+        ui.artistsVenue = v.id;
+        activeTab = "artists";
+        render();
+      });
       const btn = document.querySelector(`[data-stamp="${v.id}"]`);
       if (btn) btn.addEventListener("click", () => {
         store.toggleStamp(v.id);
@@ -682,6 +689,15 @@ function drawMapLayer(date, min) {
   }
 }
 
+function walkTimeIcon(minutes) {
+  return L.divIcon({
+    className: "",
+    html: `<div style="display:inline-block;width:max-content;background:#0f9c8c;color:#fff;font-weight:700;font-size:11px;font-family:'IBM Plex Mono',ui-monospace,monospace;padding:3px 8px;border-radius:20px;border:2px solid #14131a;box-shadow:0 2px 6px rgba(0,0,0,.5);white-space:nowrap;transform:translate(-50%,-50%)">🚶 ${minutes}分</div>`,
+    iconSize: [0, 0],
+    iconAnchor: [0, 0],
+  });
+}
+
 function drawMyRoute(layer, date, min) {
   const favs = [...store.state.favorites]
     .map((key) => store.state.performances.find((p) => perfKey(p) === key))
@@ -701,14 +717,22 @@ function drawMyRoute(layer, date, min) {
     const a = points[i];
     const b = points[i + 1];
     let latlngs = [[a.lat, a.lng], [b.lat, b.lng]];
+    let walkMin = null;
     if (a.id && b.id) {
       const route = store.routeBetween(a.id, b.id);
       if (route && route.poly) {
         latlngs = decodePolyline(route.poly);
+        walkMin = route.durMin;
+      } else {
+        walkMin = store.walkMinutes(a.id, b.id);
       }
     }
+    if (walkMin == null) walkMin = estimateWalkMin(a.lat, a.lng, b.lat, b.lng);
     const isFirst = a.id === null;
     L.polyline(latlngs, { color: "#0f9c8c", weight: 5, opacity: 0.95, dashArray: isFirst ? "2 8" : null, lineCap: "round" }).addTo(layer);
+    const midIdx = Math.floor(latlngs.length / 2);
+    const mid = latlngs.length > 2 ? latlngs[midIdx] : [(a.lat + b.lat) / 2, (a.lng + b.lng) / 2];
+    L.marker(mid, { icon: walkTimeIcon(walkMin), zIndexOffset: 300, interactive: false }).addTo(layer);
   }
   if (points.length) {
     const first = points[0];
@@ -779,6 +803,24 @@ function renderMyTT(root, date, min, over) {
   if (!dayFavs.length) {
     root.appendChild(el("div", { class: "empty-state" }, [el("span", { class: "emoji" }, "📅"), el("div", {}, "この日のお気に入りはありません")]));
     return;
+  }
+
+  if (!over && activeDay === date) {
+    root.appendChild(
+      el(
+        "button",
+        {
+          class: "btn block",
+          style: "margin-bottom:12px",
+          onclick: () => {
+            activeTab = "map";
+            ui.mapMode = "myroute";
+            render();
+          },
+        },
+        "🗺️ マップでステージ間のルート・徒歩時間を見る"
+      )
+    );
   }
 
   const warnings = computeWarnings(dayFavs);
