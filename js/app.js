@@ -32,7 +32,7 @@ const ui = {
 const finishedOpen = { now: new Set(), artists: new Set(), mytt: new Set() };
 const venueCollapseOpen = new Set();
 
-const mapState = { instance: null, center: null, zoom: null, layer: null, geoMarker: null };
+const mapState = { instance: null, center: null, zoom: null, layer: null, geoMarker: null, singleRoute: null };
 let weatherData = null;
 let geoWatchStarted = false;
 
@@ -162,6 +162,40 @@ function estimateWalk(geo, venue) {
   return estimateWalkMin(geo.lat, geo.lng, venue.lat, venue.lng);
 }
 
+// 現在地取得の導線。未取得時はボタンを、取得済み/シミュレーション中は状態テキストを表示する
+function locationRow() {
+  if (store.state.settings.simGeo) {
+    return el(
+      "div",
+      { class: "loc-row" },
+      el("span", { class: "sub-note" }, "📍 現在地シミュレーション中（⚙️設定で変更できます）")
+    );
+  }
+  if (store.state.currentGeo) {
+    return el(
+      "div",
+      { class: "loc-row" },
+      el("span", { class: "sub-note" }, "📍 現在地取得済み（徒歩時間は直線距離からの目安）")
+    );
+  }
+  const btn = el(
+    "button",
+    {
+      class: "btn small",
+      onclick: async (e) => {
+        e.target.textContent = "取得中…";
+        try {
+          await locateOnce();
+        } catch {
+          e.target.textContent = "現在地を取得できませんでした（再試行）";
+        }
+      },
+    },
+    "📍 現在地を取得して徒歩時間を表示"
+  );
+  return el("div", { class: "loc-row" }, btn);
+}
+
 function finishedDetails(key, label, content) {
   const d = el("details", { class: "finished-group" });
   d.open = finishedOpen[key.screen].has(key.id);
@@ -184,6 +218,7 @@ function renderNow(root, date, min, over) {
   if (store.state.settings.simTime) {
     root.appendChild(el("div", { class: "sub-note" }, `⏱ 時刻シミュレーション中: ${DAY_LABELS[date] || date} ${minToHHMM(min)}`));
   }
+  root.appendChild(locationRow());
 
   const playing = store.state.performances.filter((p) => isNowPlaying(p, date, min));
   const soon = store.state.performances.filter((p) => isSoon(p, date, min));
@@ -213,7 +248,15 @@ function renderNow(root, date, min, over) {
   const finishedVenues = store.state.venues.filter((v) => isVenueFinished(store.state.performances, v.id, date, date, min));
   if (finishedVenues.length) {
     const list = el("div", {});
-    finishedVenues.forEach((v) => list.appendChild(el("div", { class: "venue-name", style: "padding:6px 0" }, `${v.stageNo}. ${v.name}`)));
+    finishedVenues.forEach((v) =>
+      list.appendChild(
+        el(
+          "button",
+          { class: "link-btn", style: "display:block;padding:6px 0", onclick: () => openVenueModal(v.id, date) },
+          `${v.stageNo}. ${v.name}`
+        )
+      )
+    );
     root.appendChild(finishedDetails({ screen: "now", id: "fin" }, `🏁 終了したステージ（${finishedVenues.length}）`, list));
   }
 }
@@ -344,11 +387,16 @@ function openDetailModal(p) {
   sheet.appendChild(el("button", { class: "modal-close", onclick: close, "aria-label": "閉じる" }, "✕"));
   sheet.appendChild(el("div", { class: "modal-title" }, p.name));
   sheet.appendChild(
-    el(
-      "div",
-      { class: "modal-meta" },
-      `${DAY_LABELS[p.date] || p.date} ${fmtRange(p.start, p.end)} / ${venue ? `${venue.stageNo}. ${venue.name}` : ""}`
-    )
+    el("div", { class: "modal-meta" }, [
+      document.createTextNode(`${DAY_LABELS[p.date] || p.date} ${fmtRange(p.start, p.end)} / `),
+      venue
+        ? el(
+            "button",
+            { class: "link-btn", onclick: () => { close(); openVenueModal(venue.id, p.date); } },
+            `${venue.stageNo}. ${venue.name}`
+          )
+        : null,
+    ])
   );
   if (p.genre || p.region) {
     const tags = el("div", { class: "badges" });
@@ -445,6 +493,117 @@ function openDetailModal(p) {
   $modalRoot.appendChild(backdrop);
 }
 
+// ---------- 会場詳細モーダル ----------
+function openVenueModal(venueId, day) {
+  const venue = store.venueById(venueId);
+  if (!venue) return;
+  const state = { day: day && venue.days.includes(day) ? day : venue.days[0] || DAYS[0], from: "here" };
+
+  const backdrop = el("div", { class: "modal-backdrop", onclick: (e) => { if (e.target === backdrop) close(); } });
+  const sheet = el("div", { class: "modal-sheet" });
+  const close = () => backdrop.remove();
+
+  function redraw() {
+    sheet.innerHTML = "";
+    sheet.appendChild(el("button", { class: "modal-close", onclick: close, "aria-label": "閉じる" }, "✕"));
+    sheet.appendChild(el("div", { class: "modal-title" }, `${venue.stageNo}. ${venue.name}`));
+
+    const dayTabs = el("div", { class: "day-tabs" });
+    DAYS.forEach((d) => {
+      const open = venue.days.includes(d);
+      dayTabs.appendChild(
+        el(
+          "button",
+          {
+            class: `day-tab${state.day === d ? " active" : ""}`,
+            style: open ? "" : "opacity:.4;cursor:default",
+            onclick: () => { if (open) { state.day = d; redraw(); } },
+          },
+          DAY_LABELS[d] + (open ? "" : "（開催なし）")
+        )
+      );
+    });
+    sheet.appendChild(dayTabs);
+
+    const fromRow = el("div", { class: "modal-section", style: "display:flex;gap:10px;align-items:center;flex-wrap:wrap" });
+    const fromSelect = el("select", {
+      class: "filter-select",
+      onchange: (e) => { state.from = e.target.value; redraw(); },
+    });
+    fromSelect.appendChild(el("option", { value: "here" }, "現在地から"));
+    store.state.venues
+      .filter((v) => v.id !== venue.id)
+      .forEach((v) => {
+        fromSelect.appendChild(
+          el("option", { value: v.id, selected: state.from === v.id || undefined }, `${v.stageNo}. ${v.name}`)
+        );
+      });
+    fromSelect.value = state.from;
+
+    let walkText;
+    let fromLat = null;
+    let fromLng = null;
+    if (state.from === "here") {
+      const geo = effectiveGeo();
+      if (geo) {
+        fromLat = geo.lat;
+        fromLng = geo.lng;
+        walkText = `🚶 徒歩 約${estimateWalk(geo, venue)}分`;
+      } else {
+        walkText = "（現在地未取得）";
+      }
+    } else {
+      const fromVenue = store.venueById(state.from);
+      fromLat = fromVenue.lat;
+      fromLng = fromVenue.lng;
+      const walk = store.walkMinutes(state.from, venue.id);
+      const mins = walk != null ? walk : estimateWalkMin(fromVenue.lat, fromVenue.lng, venue.lat, venue.lng);
+      walkText = `🚶 徒歩 約${mins}分`;
+    }
+    fromRow.append(fromSelect, el("span", { class: "sub-note", style: "margin:0" }, walkText));
+    sheet.appendChild(fromRow);
+
+    const btnRow = el("div", { class: "btn-row" });
+    btnRow.appendChild(
+      el(
+        "button",
+        {
+          class: "btn",
+          onclick: () => {
+            close();
+            activeTab = "map";
+            ui.mapMode = "normal";
+            mapState.singleRoute = { fromId: state.from === "here" ? null : state.from, toId: venue.id };
+            render();
+          },
+        },
+        "🗺 地図で見る"
+      )
+    );
+    if (fromLat != null) {
+      const gmaps = `https://www.google.com/maps/dir/?api=1&origin=${fromLat},${fromLng}&destination=${venue.lat},${venue.lng}&travelmode=walking`;
+      btnRow.appendChild(el("a", { class: "btn", href: gmaps, target: "_blank", rel: "noopener" }, "ここへ行く"));
+    }
+    sheet.appendChild(btnRow);
+
+    const list = el("div", { class: "modal-section" });
+    const ps = store.state.performances
+      .filter((p) => p.date === state.day && p.venueId === venue.id)
+      .sort((a, b) => a.startMin - b.startMin);
+    if (ps.length) {
+      const { date: curDate, min: curMin } = curDateMin();
+      ps.forEach((p) => list.appendChild(perfCard(p, { date: curDate, min: curMin, showVenue: false })));
+    } else {
+      list.appendChild(el("p", { style: "color:var(--muted)" }, "この日の演奏はありません"));
+    }
+    sheet.appendChild(list);
+  }
+
+  redraw();
+  backdrop.appendChild(sheet);
+  $modalRoot.appendChild(backdrop);
+}
+
 // ---------- Tab: マップ ----------
 function renderMap(root, date, min) {
   root.appendChild(el("h1", { class: "screen-title" }, "🗺️ マップ"));
@@ -471,6 +630,7 @@ function renderMap(root, date, min) {
         class: `toggle-btn${ui.mapMode === "myroute" ? " active" : ""}`,
         onclick: () => {
           ui.mapMode = ui.mapMode === "myroute" ? "normal" : "myroute";
+          mapState.singleRoute = null;
           render();
         },
       },
@@ -479,10 +639,75 @@ function renderMap(root, date, min) {
   );
   root.appendChild(toolbar);
 
+  renderRouteBanner(root);
+
   const mapDiv = el("div", { id: "map-view" });
   root.appendChild(mapDiv);
 
   requestAnimationFrame(() => initOrUpdateMap(mapDiv, date, min));
+}
+
+// 会場詳細モーダルから「地図で見る」で指定された、現在地または特定会場→会場の単一区間ルート
+function singleRouteInfo(spec) {
+  const to = store.venueById(spec.toId);
+  if (!to) return null;
+  const from = spec.fromId ? store.venueById(spec.fromId) : effectiveGeo();
+  if (!from) return { to, from: null };
+  let walkMin = null;
+  let hasRoute = false;
+  let latlngs = [[from.lat, from.lng], [to.lat, to.lng]];
+  if (spec.fromId) {
+    const route = store.routeBetween(spec.fromId, spec.toId);
+    if (route && route.poly) {
+      latlngs = decodePolyline(route.poly);
+      walkMin = route.durMin;
+      hasRoute = true;
+    } else {
+      walkMin = store.walkMinutes(spec.fromId, spec.toId);
+    }
+  }
+  if (walkMin == null) walkMin = estimateWalkMin(from.lat, from.lng, to.lat, to.lng);
+  return { to, from, walkMin, hasRoute, latlngs };
+}
+
+function drawSingleRoute(layer, spec) {
+  const info = singleRouteInfo(spec);
+  if (!info || !info.from) return;
+  L.polyline(info.latlngs, { color: "#ffffff", weight: 8, opacity: 0.9, lineCap: "round" }).addTo(layer);
+  L.polyline(info.latlngs, { color: "#ff2f92", weight: 4, opacity: 1, lineCap: "round" }).addTo(layer);
+  L.circleMarker([info.from.lat, info.from.lng], { radius: 8, color: "#fff", weight: 3, fillColor: "#ff2f92", fillOpacity: 1 }).addTo(layer);
+  mapState.instance.fitBounds(L.latLngBounds(info.latlngs), { padding: [56, 56] });
+}
+
+function renderRouteBanner(root) {
+  const spec = mapState.singleRoute;
+  if (!spec) return;
+  const info = singleRouteInfo(spec);
+  const toLabel = info?.to ? `${info.to.stageNo}. ${info.to.name}` : "";
+  const fromVenue = spec.fromId ? store.venueById(spec.fromId) : null;
+  const fromLabel = spec.fromId ? (fromVenue ? `${fromVenue.stageNo}. ${fromVenue.name}` : "") : "現在地";
+
+  const banner = el("div", { class: "route-banner" });
+  banner.appendChild(
+    el("div", { class: "route-banner-head" }, [
+      el("div", { class: "route-banner-title" }, `${fromLabel} → ${toLabel}`),
+      el(
+        "button",
+        { class: "modal-close", style: "position:static", onclick: () => { mapState.singleRoute = null; render(); } },
+        "✕"
+      ),
+    ])
+  );
+  let subText;
+  if (!info || !info.from) subText = "現在地が未取得です（マップ左上の📍ボタンで取得できます）";
+  else if (info.hasRoute) subText = `🚶 徒歩約${info.walkMin}分`;
+  else subText = `📏 直線距離からの概算 徒歩約${info.walkMin}分（実測ルート未取得）`;
+  banner.appendChild(el("div", { class: "sub-note", style: "margin:0" }, subText));
+  if (info && info.from) {
+    const gmaps = `https://www.google.com/maps/dir/?api=1&origin=${info.from.lat},${info.from.lng}&destination=${info.to.lat},${info.to.lng}&travelmode=walking`;
+    banner.appendChild(el("a", { class: "btn small", href: gmaps, target: "_blank", rel: "noopener" }, "Googleマップで開く"));
+  }
+  root.appendChild(banner);
 }
 
 function searchOnMap(q) {
@@ -575,6 +800,30 @@ function initOrUpdateMap(mapDiv, date, min) {
       mapState.center = map.getCenter();
       mapState.zoom = map.getZoom();
     });
+
+    const locBtn = L.control({ position: "topleft" });
+    locBtn.onAdd = () => {
+      const b = L.DomUtil.create("button", "map-loc-btn");
+      b.type = "button";
+      b.textContent = "📍";
+      b.title = "現在地を取得";
+      L.DomEvent.disableClickPropagation(b);
+      L.DomEvent.on(b, "click", async (e) => {
+        L.DomEvent.stop(e);
+        b.textContent = "…";
+        try {
+          const geo = await locateOnce();
+          b.textContent = "📍";
+          map.setView([geo.lat, geo.lng], 16);
+        } catch {
+          b.textContent = "❌";
+          setTimeout(() => { b.textContent = "📍"; }, 1500);
+        }
+      });
+      return b;
+    };
+    locBtn.addTo(map);
+
     mapState.instance = map;
   } else {
     // 別のdivへ再アタッチ（タブ切替でDOMが作り直されるため）
@@ -605,16 +854,14 @@ function drawMapLayer(date, min) {
       icon: venueDivIcon(v.stageNo, "#39e0c9", finished),
     }).addTo(layer);
     let popupHtml = `<b>${v.stageNo}. ${v.name}</b>`;
-    popupHtml += `<br><button data-tt="${v.id}" style="margin-top:6px">📅 タイムテーブルを見る</button>`;
+    popupHtml += `<br><button data-tt="${v.id}" style="margin-top:6px">📅 会場の詳細を見る</button>`;
     const gmaps = `https://www.google.com/maps/dir/?api=1&destination=${v.lat},${v.lng}&travelmode=walking`;
     popupHtml += `<br><a href="${gmaps}" target="_blank" rel="noopener">Googleマップで徒歩ナビ</a>`;
     marker.bindPopup(popupHtml);
     marker.on("popupopen", () => {
       const ttBtn = document.querySelector(`[data-tt="${v.id}"]`);
       if (ttBtn) ttBtn.addEventListener("click", () => {
-        ui.artistsVenue = v.id;
-        activeTab = "artists";
-        render();
+        openVenueModal(v.id, date);
       });
     });
   });
@@ -633,6 +880,9 @@ function drawMapLayer(date, min) {
 
   if (ui.mapMode === "myroute") {
     drawMyRoute(layer, date, min);
+  }
+  if (mapState.singleRoute) {
+    drawSingleRoute(layer, mapState.singleRoute);
   }
 
   const geo = effectiveGeo();
@@ -1109,15 +1359,21 @@ function checkUrlImport() {
 
 // ---------- 現在地取得 ----------
 function locateOnce() {
-  if (!navigator.geolocation) return;
-  navigator.geolocation.getCurrentPosition(
-    (pos) => {
-      store.state.currentGeo = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-      render();
-    },
-    () => {},
-    { enableHighAccuracy: true, timeout: 8000 }
-  );
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error("geolocation unavailable"));
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        store.state.currentGeo = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        render();
+        resolve(store.state.currentGeo);
+      },
+      (err) => reject(err),
+      { enableHighAccuracy: true, timeout: 8000 }
+    );
+  });
 }
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible" && store.state.settings.autoLocate && !store.state.settings.simGeo) locateOnce();

@@ -241,7 +241,22 @@ details.finished-group[open] > summary { margin-bottom: 4px; }
 }
 .btn.primary { background: var(--accent); color: #14131a; border-color: var(--accent); font-weight: 700; }
 .btn.block { width: 100%; }
+.btn.small { padding: 6px 12px; font-size: .8rem; text-decoration: none; display: inline-block; }
 .btn-row { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+
+.link-btn {
+  background: none; border: none; padding: 0; margin: 0;
+  color: var(--route); text-decoration: underline; text-underline-offset: 2px;
+  cursor: pointer; font: inherit; text-align: left;
+}
+.loc-row { margin-bottom: 12px; }
+
+.route-banner {
+  background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+  padding: 12px 14px; margin-bottom: 10px; display: flex; flex-direction: column; gap: 6px;
+}
+.route-banner-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.route-banner-title { font-weight: 700; font-size: .92rem; }
 
 /* ---------- map ---------- */
 #map-view { height: calc(100vh - 210px); min-height: 360px; border-radius: 14px; overflow: hidden; border: 1px solid var(--line); isolation: isolate; }
@@ -255,6 +270,12 @@ details.finished-group[open] > summary { margin-bottom: 4px; }
 
 .leaflet-popup-content-wrapper { background: var(--bg-2); color: var(--ink); }
 .leaflet-popup-tip { background: var(--bg-2); }
+.map-loc-btn {
+  width: 34px; height: 34px;
+  background: var(--bg-2); border: 2px solid rgba(0,0,0,.2); border-radius: 6px;
+  font-size: 1.1rem; cursor: pointer; color: var(--ink);
+}
+.map-loc-btn:hover { background: var(--card); }
 .pin-tieup { position: relative; }
 .pin-tieup::after {
   content: ""; position: absolute; left: 50%; bottom: -6px; transform: translateX(-50%);
