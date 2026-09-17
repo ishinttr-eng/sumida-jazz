@@ -1,0 +1,38 @@
+name: Update festival data
+
+on:
+  schedule:
+    - cron: "0 */3 * * *"
+  workflow_dispatch: {}
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch official timetable
+        run: |
+          mkdir -p tools/raw
+          curl -sL "https://sumida-jazz.jp/sj/timetable.html" -o tools/raw/timetable.html
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build data
+        run: python3 tools/build_data.py
+
+      - name: Commit changes
+        run: |
+          git config user.name "sumida-jazz-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add data/venues.json data/performances.json data/checked.json data/changes.json
+          if git diff --cached --quiet; then
+            echo "no changes"
+          else
+            git commit -m "chore: update festival data ($(date -u +%Y-%m-%dT%H:%M:%SZ))"
+            git push
+          fi

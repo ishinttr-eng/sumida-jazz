@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <rect width="200" height="200" rx="40" fill="#141a2e"/>
+  <circle cx="100" cy="100" r="72" fill="none" stroke="#e6a740" stroke-width="6"/>
+  <text x="100" y="128" font-size="104" text-anchor="middle" font-family="'Hiragino Sans','Noto Sans JP',sans-serif">&#127927;</text>
+</svg>

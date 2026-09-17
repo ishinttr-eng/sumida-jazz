@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>すみだジャズナビ 2026</title>
+<meta name="description" content="すみだストリートジャズフェスティバル2026 非公式ナビゲーター">
+<meta name="theme-color" content="#141a2e">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" integrity="sha512-h9FcoyWjHcOcmEVkxOfTLnmZFWIH0iZhZT1H2TbOq55xssQGEJHEaIm+PgoUaZbRvQTNTluNOEfb1ZRy6D3BOw==" crossorigin="anonymous" referrerpolicy="no-referrer">
+<link rel="stylesheet" href="css/style.css">
+<script>
+  try {
+    var s = JSON.parse(localStorage.getItem("sjz.settings.v1") || "{}");
+    if (s.fontSize === "large") document.documentElement.classList.add("font-large");
+    if (s.theme === "dark") document.documentElement.setAttribute("data-theme", "dark");
+    if (s.theme === "light") document.documentElement.setAttribute("data-theme", "light");
+  } catch (e) {}
+</script>
+</head>
+<body>
+<div id="app">
+  <header id="app-header">
+    <div class="brand">
+      <span class="brand-mark">&#127927;</span>
+      <span class="brand-name">すみだジャズナビ</span>
+    </div>
+    <div class="header-actions">
+      <button id="btn-changelog" class="icon-btn" aria-label="更新履歴" title="更新履歴">&#128226;</button>
+      <button id="btn-settings" class="icon-btn" aria-label="設定" title="設定">&#9881;&#65039;</button>
+    </div>
+  </header>
+
+  <main id="main" aria-live="polite"></main>
+
+  <nav id="tabbar">
+    <button class="tab-btn" data-tab="now" aria-label="演奏中">
+      <span class="tab-icon">&#127930;</span><span class="tab-label">演奏中</span>
+    </button>
+    <button class="tab-btn" data-tab="artists" aria-label="出演者">
+      <span class="tab-icon">&#128197;</span><span class="tab-label">出演者</span>
+    </button>
+    <button class="tab-btn" data-tab="map" aria-label="マップ">
+      <span class="tab-icon">&#128506;&#65039;</span><span class="tab-label">マップ</span>
+    </button>
+    <button class="tab-btn" data-tab="mytt" aria-label="マイタイムテーブル">
+      <span class="tab-icon">&#9733;</span><span class="tab-label">マイTT</span>
+    </button>
+  </nav>
+</div>
+
+<div id="modal-root"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js" integrity="sha512-puJW3E/qXDqYp9IfhAI54BJEaWIfloJ7JWs7OeD5i6ruC9JZL1gERT1wjtwXFlh7CjE7ZJ+/vcRZRkIYIb6p4g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script type="module" src="js/app.js"></script>
+<script>
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("sw.js").catch(() => {});
+    });
+  }
+</script>
+</body>
+</html>
