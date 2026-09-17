@@ -536,6 +536,23 @@ function pinDivIcon(label, color, offset) {
   });
 }
 
+// 会場マーカー: ステージ番号を常時表示する円形ピン（下向きの吹き出し尻尾付き）
+function venueDivIcon(stageNo, color, finished) {
+  const size = stageNo >= 10 ? 34 : 30;
+  const opacity = finished ? 0.42 : 1;
+  const tail = 8;
+  return L.divIcon({
+    className: "",
+    html: `<div style="position:relative;width:${size}px;height:${size + tail}px;opacity:${opacity}">
+      <div style="position:absolute;top:0;left:0;width:${size}px;height:${size}px;border-radius:50%;background:${color};border:2.5px solid #14131a;box-shadow:0 2px 6px rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;color:#14131a;font-weight:800;font-size:13px;line-height:1;font-family:'IBM Plex Mono',ui-monospace,monospace">${stageNo}</div>
+      <div style="position:absolute;top:${size - 3}px;left:${size / 2 - tail / 2}px;width:0;height:0;border-left:${tail / 2}px solid transparent;border-right:${tail / 2}px solid transparent;border-top:${tail}px solid #14131a"></div>
+    </div>`,
+    iconSize: [size, size + tail],
+    iconAnchor: [size / 2, size + tail],
+    popupAnchor: [0, -(size + tail)],
+  });
+}
+
 function decodePolyline(str, precision = 5) {
   let index = 0,
     lat = 0,
@@ -616,13 +633,10 @@ function drawMapLayer(date, min) {
   venuesToShow.forEach((v) => {
     const finished = isVenueFinished(store.state.performances, v.id, null, date, min);
     const isStamp = stampTarget.has(v.id);
-    const color = isStamp ? "#e6a740" : "#4fd8c9";
-    const marker = L.circleMarker([v.lat, v.lng], {
-      radius: 9,
-      color: "#fff",
-      weight: 2,
-      fillColor: color,
-      fillOpacity: finished ? 0.35 : 0.95,
+    const color = isStamp ? "#ffb020" : "#39e0c9";
+    const marker = L.marker([v.lat, v.lng], {
+      icon: venueDivIcon(v.stageNo, color, finished),
+      zIndexOffset: isStamp ? 200 : 0,
     }).addTo(layer);
     let popupHtml = `<b>${v.stageNo}. ${v.name}</b>`;
     if (ui.mapMode === "stamp") {
@@ -662,7 +676,7 @@ function drawMapLayer(date, min) {
 
   const geo = effectiveGeo();
   if (geo) {
-    L.circleMarker([geo.lat, geo.lng], { radius: 7, color: "#fff", weight: 2, fillColor: "#4f8cd8", fillOpacity: 1 })
+    L.circleMarker([geo.lat, geo.lng], { radius: 9, color: "#fff", weight: 3, fillColor: "#3d8bff", fillOpacity: 1 })
       .addTo(layer)
       .bindPopup("現在地");
   }
@@ -694,11 +708,11 @@ function drawMyRoute(layer, date, min) {
       }
     }
     const isFirst = a.id === null;
-    L.polyline(latlngs, { color: "#4fd8c9", weight: 4, opacity: 0.9, dashArray: isFirst ? "6 6" : null }).addTo(layer);
+    L.polyline(latlngs, { color: "#0f9c8c", weight: 5, opacity: 0.95, dashArray: isFirst ? "2 8" : null, lineCap: "round" }).addTo(layer);
   }
   if (points.length) {
     const first = points[0];
-    L.circleMarker([first.lat, first.lng], { radius: 8, color: "#4fd8c9", weight: 3, fillOpacity: 0 }).addTo(layer);
+    L.circleMarker([first.lat, first.lng], { radius: 9, color: "#0f9c8c", weight: 4, fillOpacity: 0 }).addTo(layer);
   }
 }
 
