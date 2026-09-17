@@ -2,7 +2,6 @@ import * as store from "./store.js";
 import {
   DAYS,
   DAY_LABELS,
-  STAMP_STAGE_NOS,
   el,
   normalize,
   perfKey,
@@ -26,7 +25,7 @@ const ui = {
   artistsSearch: "",
   artistsVenue: "",
   artistsGenre: "",
-  mapMode: "normal", // normal | myroute | stamp
+  mapMode: "normal", // normal | myroute
   mapSearch: "",
   myttMode: "list", // list | schedule
 };
@@ -478,35 +477,12 @@ function renderMap(root, date, min) {
       "🎟️ マイルート"
     )
   );
-  toolbar.appendChild(
-    el(
-      "button",
-      {
-        class: `toggle-btn${ui.mapMode === "stamp" ? " active" : ""}`,
-        onclick: () => {
-          ui.mapMode = ui.mapMode === "stamp" ? "normal" : "stamp";
-          render();
-        },
-      },
-      "🎫 スタンプラリー"
-    )
-  );
   root.appendChild(toolbar);
-
-  if (ui.mapMode === "stamp") {
-    root.appendChild(el("div", { class: "sub-note", id: "stamp-progress" }, stampProgressText(date)));
-  }
 
   const mapDiv = el("div", { id: "map-view" });
   root.appendChild(mapDiv);
 
   requestAnimationFrame(() => initOrUpdateMap(mapDiv, date, min));
-}
-
-function stampProgressText(date) {
-  const target = store.state.venues.filter((v) => STAMP_STAGE_NOS.includes(v.stageNo) && v.days.includes(date));
-  const done = target.filter((v) => store.state.stamps.has(v.id)).length;
-  return `達成 ${done} / ${target.length}`;
 }
 
 function searchOnMap(q) {
@@ -617,33 +593,19 @@ function drawMapLayer(date, min) {
   const layer = L.layerGroup().addTo(map);
   mapState.layer = layer;
 
-  const stampTarget = new Set(
-    store.state.venues.filter((v) => STAMP_STAGE_NOS.includes(v.stageNo)).map((v) => v.id)
-  );
-
   // 座標重複検出
   const coordCount = new Map();
   const keyOf = (lat, lng) => `${lat.toFixed(5)},${lng.toFixed(5)}`;
   store.state.venues.forEach((v) => coordCount.set(keyOf(v.lat, v.lng), (coordCount.get(keyOf(v.lat, v.lng)) || 0) + 1));
   const tieupOffsetSeen = new Map();
 
-  let venuesToShow = store.state.venues;
-  if (ui.mapMode === "stamp") venuesToShow = store.state.venues.filter((v) => stampTarget.has(v.id));
-
-  venuesToShow.forEach((v) => {
+  store.state.venues.forEach((v) => {
     const finished = isVenueFinished(store.state.performances, v.id, null, date, min);
-    const isStamp = stampTarget.has(v.id);
-    const color = isStamp ? "#ffb020" : "#39e0c9";
     const marker = L.marker([v.lat, v.lng], {
-      icon: venueDivIcon(v.stageNo, color, finished),
-      zIndexOffset: isStamp ? 200 : 0,
+      icon: venueDivIcon(v.stageNo, "#39e0c9", finished),
     }).addTo(layer);
     let popupHtml = `<b>${v.stageNo}. ${v.name}</b>`;
     popupHtml += `<br><button data-tt="${v.id}" style="margin-top:6px">📅 タイムテーブルを見る</button>`;
-    if (ui.mapMode === "stamp") {
-      const visited = store.state.stamps.has(v.id);
-      popupHtml += `<br><button data-stamp="${v.id}" style="margin-top:6px">${visited ? "✓ 訪問済み" : "訪問済みにする"}</button>`;
-    }
     const gmaps = `https://www.google.com/maps/dir/?api=1&destination=${v.lat},${v.lng}&travelmode=walking`;
     popupHtml += `<br><a href="${gmaps}" target="_blank" rel="noopener">Googleマップで徒歩ナビ</a>`;
     marker.bindPopup(popupHtml);
@@ -653,14 +615,6 @@ function drawMapLayer(date, min) {
         ui.artistsVenue = v.id;
         activeTab = "artists";
         render();
-      });
-      const btn = document.querySelector(`[data-stamp="${v.id}"]`);
-      if (btn) btn.addEventListener("click", () => {
-        store.toggleStamp(v.id);
-        marker.closePopup();
-        drawMapLayer(date, min);
-        const progress = document.getElementById("stamp-progress");
-        if (progress) progress.textContent = stampProgressText(date);
       });
     });
   });
@@ -943,7 +897,6 @@ function exportFavoritesFile() {
     exportedAt: new Date().toISOString(),
     favorites: [...store.state.favorites],
     reviews: Object.fromEntries(store.state.reviews),
-    stamps: [...store.state.stamps],
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);

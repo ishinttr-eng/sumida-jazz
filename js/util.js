@@ -6,8 +6,6 @@ export const DAY_LABELS = { "2026-10-17": "10/17(土)", "2026-10-18": "10/18(日
 export const WEATHER_LAT = 35.6969;
 export const WEATHER_LNG = 139.8144;
 
-export const STAMP_STAGE_NOS = [1, 2, 9, 12, 17, 19];
-
 export function toMin(hhmm) {
   if (!hhmm) return null;
   const [h, m] = hhmm.split(":").map(Number);

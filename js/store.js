@@ -5,7 +5,6 @@ import { toMin, perfKey, WEATHER_LAT, WEATHER_LNG } from "./util.js";
 const LS = {
   favorites: "sjz.favorites.v1",
   reviews: "sjz.reviews.v1",
-  stamps: "sjz.stamps.v1",
   settings: "sjz.settings.v1",
   seenChanges: "sjz.seenChanges.v1",
 };
@@ -37,7 +36,6 @@ export const state = {
   appChangelog: null,
   favorites: new Set(loadJSON(LS.favorites, [])),
   reviews: new Map(Object.entries(loadJSON(LS.reviews, {}))),
-  stamps: new Set(loadJSON(LS.stamps, [])),
   settings: Object.assign(
     {
       fontSize: "normal", // normal | large
@@ -57,9 +55,6 @@ export function persistFavorites() {
 }
 export function persistReviews() {
   saveJSON(LS.reviews, Object.fromEntries(state.reviews));
-}
-export function persistStamps() {
-  saveJSON(LS.stamps, [...state.stamps]);
 }
 export function persistSettings() {
   saveJSON(LS.settings, state.settings);
@@ -85,12 +80,6 @@ export function setReview(p, rating, note) {
 }
 export function getReview(p) {
   return state.reviews.get(perfKey(p)) || null;
-}
-
-export function toggleStamp(venueId) {
-  if (state.stamps.has(venueId)) state.stamps.delete(venueId);
-  else state.stamps.add(venueId);
-  persistStamps();
 }
 
 async function fetchJSON(path) {
