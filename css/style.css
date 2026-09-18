@@ -188,6 +188,14 @@ a { color: var(--route); }
 .perf-card .name { font-weight: 700; font-size: .96rem; margin-bottom: 2px; word-break: break-word; }
 .perf-card .venue-name { font-size: .78rem; color: var(--muted); }
 .perf-card .badges { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
+
+.mytt-connector {
+  margin: -2px 0 8px 4px;
+  padding-left: 12px;
+  font-size: .74rem; color: var(--muted); font-family: var(--font-mono);
+  border-left: 2px dotted var(--line);
+}
+.mytt-connector.tight { color: var(--ng); font-weight: 700; border-left-color: var(--ng); }
 .badge {
   font-size: .68rem; padding: 2px 7px; border-radius: 20px; background: var(--bg-2); color: var(--muted);
   border: 1px solid var(--line);
@@ -233,13 +241,6 @@ details.finished-group[open] > summary { margin-bottom: 4px; }
 .modal-section { margin: 14px 0; }
 .modal-section h4 { font-size: .78rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 8px; }
 
-.rating-stars { display: flex; gap: 4px; font-size: 1.5rem; cursor: pointer; }
-.rating-stars .star { color: var(--line); }
-.rating-stars .star.filled { color: var(--accent); }
-.note-input {
-  width: 100%; min-height: 72px; padding: 10px; border-radius: 10px; border: 1px solid var(--line);
-  background: var(--card); color: var(--ink); resize: vertical;
-}
 .btn {
   padding: 9px 16px; border-radius: 10px; border: 1px solid var(--line); background: var(--card);
   color: var(--ink); cursor: pointer; font-size: .88rem;

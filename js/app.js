@@ -401,7 +401,6 @@ function renderArtists(root, date, min) {
 // ---------- detail modal ----------
 function openDetailModal(p) {
   const venue = store.venueById(p.venueId);
-  const review = store.getReview(p) || { rating: 0, note: "" };
   const backdrop = el("div", { class: "modal-backdrop", onclick: (e) => { if (e.target === backdrop) close(); } });
   const sheet = el("div", { class: "modal-sheet" });
   const close = () => backdrop.remove();
@@ -452,49 +451,6 @@ function openDetailModal(p) {
     )
   );
   sheet.appendChild(favSection);
-
-  const reviewSection = el("div", { class: "modal-section" });
-  reviewSection.appendChild(el("h4", {}, "感想・評価"));
-  let curRating = review.rating;
-  const stars = el("div", { class: "rating-stars" });
-  const drawStars = () => {
-    stars.innerHTML = "";
-    for (let i = 1; i <= 5; i++) {
-      stars.appendChild(
-        el(
-          "span",
-          {
-            class: `star${i <= curRating ? " filled" : ""}`,
-            onclick: () => {
-              curRating = curRating === i ? 0 : i;
-              drawStars();
-            },
-          },
-          "★"
-        )
-      );
-    }
-  };
-  drawStars();
-  reviewSection.appendChild(stars);
-  const noteInput = el("textarea", { class: "note-input", placeholder: "感想メモ" }, review.note);
-  reviewSection.appendChild(noteInput);
-  reviewSection.appendChild(
-    el(
-      "button",
-      {
-        class: "btn primary",
-        style: "margin-top:8px",
-        onclick: () => {
-          store.setReview(p, curRating, noteInput.value);
-          render();
-          close();
-        },
-      },
-      "保存"
-    )
-  );
-  sheet.appendChild(reviewSection);
 
   if (venue) {
     const mapBtn = el(
@@ -713,6 +669,8 @@ function drawSingleRoute(layer, spec) {
   L.polyline(info.latlngs, { color: "#ffffff", weight: 8, opacity: 0.9, lineCap: "round" }).addTo(layer);
   L.polyline(info.latlngs, { color: "#ff2f92", weight: 4, opacity: 1, lineCap: "round" }).addTo(layer);
   L.circleMarker([info.from.lat, info.from.lng], { radius: 8, color: "#fff", weight: 3, fillColor: "#ff2f92", fillOpacity: 1 }).addTo(layer);
+  const mid = info.latlngs[Math.floor(info.latlngs.length / 2)];
+  L.marker(mid, { icon: walkTimeIcon(info.walkMin, "#ff2f92"), interactive: false, zIndexOffset: 1200 }).addTo(layer);
   mapState.instance.fitBounds(L.latLngBounds(info.latlngs), { padding: [56, 56] });
 }
 
@@ -966,6 +924,16 @@ function endpointIcon(kind, color) {
       });
 }
 
+// 経路線の中間地点に添える徒歩時間ラベル
+function walkTimeIcon(minutes, color = "#0f9c8c") {
+  return L.divIcon({
+    className: "",
+    html: `<div style="display:inline-block;width:max-content;background:${color};color:#14131a;font-weight:700;font-size:11px;font-family:'IBM Plex Mono',ui-monospace,monospace;padding:3px 8px;border-radius:20px;border:2px solid #14131a;box-shadow:0 2px 6px rgba(0,0,0,.5);white-space:nowrap;transform:translate(-50%,-50%)">🚶 ${minutes}分</div>`,
+    iconSize: [0, 0],
+    iconAnchor: [0, 0],
+  });
+}
+
 // 現在時刻（シミュレーション込み）を基準に、マイタイムテーブルでまだ終了していない移動区間を
 // すべて求める（直前の（終了済み最後の）お気に入り→次のお気に入り→その次…と連なる区間の配列）
 function computeMyRouteSegments(date, min) {
@@ -1045,17 +1013,20 @@ function drawMyRoute(layer, date, min) {
     let line = null;
     let startMarker = null;
     let endMarker = null;
+    let timeMarker = null;
     if (d.coords) {
       const dash = d.hasRoute ? null : "7 9";
       halo = L.polyline(d.coords, { color: "#ffffff", weight: 7, opacity: 0.85, dashArray: dash }).addTo(layer);
       line = L.polyline(d.coords, { color, weight: 4, opacity: 0.85, dashArray: dash }).addTo(layer);
       startMarker = L.marker(d.coords[0], { icon: endpointIcon("start", color), interactive: false, zIndexOffset: 1000 }).addTo(layer);
       endMarker = L.marker(d.coords[d.coords.length - 1], { icon: endpointIcon("end", color), interactive: false, zIndexOffset: 1000 }).addTo(layer);
+      const mid = d.coords[Math.floor(d.coords.length / 2)];
+      timeMarker = L.marker(mid, { icon: walkTimeIcon(d.walkMin, color), interactive: false, zIndexOffset: 1200, opacity: 0 }).addTo(layer);
     }
-    return { ...d, halo, line, startMarker, endMarker };
+    return { ...d, halo, line, startMarker, endMarker, timeMarker };
   });
 
-  // フォーカス中の区間だけ太く・不透明に、他は細く・薄くして「今どの線か」を一目で分かるようにする
+  // フォーカス中の区間だけ太く・不透明に、徒歩時間ラベルも付ける。他は細く・薄くして「今どの線か」を一目で分かるようにする
   const applyHighlight = (idx) => {
     segInfo.forEach((s, i) => {
       if (!s.line) return;
@@ -1064,6 +1035,7 @@ function drawMyRoute(layer, date, min) {
       s.line.setStyle({ weight: focused ? 5 : 4, opacity: focused ? 1 : 0.85 });
       s.startMarker.setOpacity(focused ? 1 : 0.6);
       s.endMarker.setOpacity(focused ? 1 : 0.6);
+      s.timeMarker?.setOpacity(focused ? 1 : 0);
       if (focused) s.line.bringToFront();
     });
   };
@@ -1260,10 +1232,10 @@ function renderMyTT(root, date, min, over) {
   } else {
     const finished = dayFavs.filter((p) => p.date < date || (p.date === date && p.endMin <= min));
     const active = dayFavs.filter((p) => !finished.includes(p));
-    active.forEach((p) => root.appendChild(perfCard(p, { date, min })));
+    appendPerfCardsWithConnectors(root, active, date, min);
     if (finished.length) {
       const wrap = el("div", {});
-      finished.forEach((p) => wrap.appendChild(perfCard(p, { date, min })));
+      appendPerfCardsWithConnectors(wrap, finished, date, min);
       root.appendChild(finishedDetails({ screen: "mytt", id: activeDay }, `🏁 終了したステージ（${finished.length}）`, wrap));
     }
   }
@@ -1277,6 +1249,31 @@ function renderMyTT(root, date, min, over) {
       )
     );
   }
+}
+
+// お気に入りの演目カードを、連続する2件の間にそのステージ間の移動時間を挟みながら描画する
+function appendPerfCardsWithConnectors(container, list, date, min) {
+  list.forEach((p, i) => {
+    container.appendChild(perfCard(p, { date, min }));
+    if (i < list.length - 1) {
+      const connector = travelConnector(list[i], list[i + 1]);
+      if (connector) container.appendChild(connector);
+    }
+  });
+}
+
+function travelConnector(a, b) {
+  if (a.venueId === b.venueId) {
+    return el("div", { class: "mytt-connector" }, "同じ会場");
+  }
+  const venueA = store.venueById(a.venueId);
+  const venueB = store.venueById(b.venueId);
+  if (!venueA || !venueB) return null;
+  const walk = store.walkMinutes(a.venueId, b.venueId);
+  const mins = walk != null ? walk : estimateWalkMin(venueA.lat, venueA.lng, venueB.lat, venueB.lng);
+  const gap = b.startMin - a.endMin;
+  const tight = gap < mins;
+  return el("div", { class: `mytt-connector${tight ? " tight" : ""}` }, `🚶 徒歩${mins}分`);
 }
 
 function computeWarnings(dayFavs) {
@@ -1357,7 +1354,6 @@ function exportFavoritesFile() {
   const data = {
     exportedAt: new Date().toISOString(),
     favorites: [...store.state.favorites],
-    reviews: Object.fromEntries(store.state.reviews),
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
