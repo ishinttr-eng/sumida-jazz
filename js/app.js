@@ -521,18 +521,14 @@ function openVenueModal(venueId, day) {
   if (!venue) return;
   const state = { day: day && venue.days.includes(day) ? day : venue.days[0] || DAYS[0], from: "here" };
 
+  // モーダルは画面全体を覆うので、選択中の色は裏の地図には見えない。閉じて地図に戻ったときに
+  // 「さっき見ていた会場」だと分かるよう、選択状態は閉じても解除せずそのまま残す
   mapState.selectedVenueId = venue.id;
   refreshMapMarkers();
 
   const backdrop = el("div", { class: "modal-backdrop", onclick: (e) => { if (e.target === backdrop) close(); } });
   const sheet = el("div", { class: "modal-sheet" });
-  const close = () => {
-    backdrop.remove();
-    if (mapState.selectedVenueId === venue.id) {
-      mapState.selectedVenueId = null;
-      refreshMapMarkers();
-    }
-  };
+  const close = () => backdrop.remove();
 
   function redraw() {
     sheet.innerHTML = "";
