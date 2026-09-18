@@ -34,6 +34,7 @@ export const state = {
   checked: null,
   changes: null,
   appChangelog: null,
+  performancesUpdatedAt: null,
   favorites: new Set(loadJSON(LS.favorites, [])),
   reviews: new Map(Object.entries(loadJSON(LS.reviews, {}))),
   settings: Object.assign(
@@ -99,6 +100,7 @@ export async function loadAll() {
     startMin: toMin(p.start),
     endMin: toMin(p.end),
   }));
+  state.performancesUpdatedAt = performances.updatedAt || null;
 
   const optional = async (path, fallback) => {
     try {

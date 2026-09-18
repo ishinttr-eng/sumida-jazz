@@ -1548,11 +1548,40 @@ document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible" && store.state.settings.autoLocate && !store.state.settings.simGeo) locateOnce();
 });
 
+// ---------- ヘッダー: バージョン・公式データ確認日時 ----------
+// sw.js側のCACHE_NAME(=VERSION)と二重管理にならないよう、値そのものはここでは持たない
+async function currentSwVersion() {
+  if (!("caches" in window)) return null;
+  try {
+    const key = (await caches.keys()).find((k) => k.startsWith("sjz-"));
+    return key ? key.slice("sjz-".length) : null;
+  } catch {
+    return null;
+  }
+}
+
+async function updateHeaderInfo() {
+  const el2 = document.getElementById("header-updated");
+  if (!el2) return;
+  const checkedAt = store.state.checked?.checkedAt || store.state.performancesUpdatedAt;
+  const ver = await currentSwVersion();
+  if (!checkedAt) {
+    el2.textContent = ver || "";
+    return;
+  }
+  const d = new Date(checkedAt);
+  const text =
+    `確認: ${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}時点` +
+    (ver ? ` / ${ver}` : "");
+  el2.textContent = text;
+}
+
 // ---------- init ----------
 async function init() {
   await store.loadAll();
   updateChangelogBadge();
   checkUrlImport();
+  updateHeaderInfo();
   if (store.state.settings.autoLocate && !store.state.settings.simGeo) locateOnce();
   render();
   store.fetchWeather().then((w) => {
