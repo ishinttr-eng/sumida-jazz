@@ -1,6 +1,6 @@
 // すみだジャズナビ Service Worker
 // UI・見た目・ロジックを変更したら必ず VERSION を上げること
-const VERSION = "v5";
+const VERSION = "v6";
 const CACHE_NAME = `sjz-${VERSION}`;
 
 const APP_SHELL = [

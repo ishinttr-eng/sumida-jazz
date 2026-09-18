@@ -258,6 +258,39 @@ details.finished-group[open] > summary { margin-bottom: 4px; }
 .route-banner-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
 .route-banner-title { font-weight: 700; font-size: .92rem; }
 
+/* ルート線の始点・終点マーカー: 始点=丸いリング、終点=雫形のピンで形から見分ける */
+.route-endpoint span { display: block; box-shadow: 0 1px 4px rgba(0,0,0,.5); }
+.route-endpoint.start span {
+  width: 14px; height: 14px; border-radius: 50%;
+  background: #fff; border: 3px solid var(--dot-color, #333);
+}
+.route-endpoint.end span {
+  width: 20px; height: 20px; border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  background: var(--dot-color, #333); border: 2px solid #fff;
+}
+
+/* マイルート: 時刻設定のスライダーのように、カードを1件ずつ縦スワイプ（スクロールスナップ）
+   で切り替える。地図の占有を1カード分の高さに固定し、地図を圧迫しないようにする */
+.myroute-banner { flex-direction: row !important; align-items: center; padding: 6px 8px 6px 10px; gap: 6px; }
+.myroute-nav {
+  flex: 0 0 auto; width: 22px; height: 22px; border: none; border-radius: 6px;
+  background: var(--bg-2); color: var(--muted); font-size: .65rem; line-height: 1; cursor: pointer;
+}
+.myroute-carousel-wrap { flex: 1; min-width: 0; overflow: hidden; }
+.myroute-carousel { height: 56px; overflow-y: auto; scroll-snap-type: y mandatory; scrollbar-width: none; }
+.myroute-carousel::-webkit-scrollbar { display: none; }
+.myroute-card {
+  height: 56px; box-sizing: border-box; scroll-snap-align: start;
+  display: flex; align-items: center; gap: 6px; padding: 2px 0;
+}
+.myroute-main { flex: 1; min-width: 0; font-size: .78rem; color: var(--ink); }
+.myroute-route, .myroute-sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.myroute-sub { font-size: .68rem; color: var(--muted); margin-top: 1px; }
+.myroute-g { flex: 0 0 auto; color: var(--accent); text-decoration: none; font-size: .85rem; padding: 0 2px; }
+.myroute-counter { font-size: .68rem; color: var(--muted); white-space: nowrap; }
+.route-banner-btns { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
+
 /* ---------- map ---------- */
 #map-view { height: calc(100vh - 210px); min-height: 360px; border-radius: 14px; overflow: hidden; border: 1px solid var(--line); isolation: isolate; }
 .map-toolbar { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }

@@ -32,9 +32,22 @@ const ui = {
 const finishedOpen = { now: new Set(), artists: new Set(), mytt: new Set() };
 const venueCollapseOpen = new Set();
 
-const mapState = { instance: null, center: null, zoom: null, layer: null, geoMarker: null, singleRoute: null };
+const mapState = {
+  instance: null,
+  center: null,
+  zoom: null,
+  layer: null,
+  geoMarker: null,
+  singleRoute: null,
+  myRouteSegInfo: null,
+  myRouteApplyHighlight: null,
+  myRouteFocusMap: null,
+};
 let weatherData = null;
 let geoWatchStarted = false;
+let myRouteIndex = 0; // マイルートでフォーカス中の区間（カードのスワイプで移動）
+const ROUTE_COLORS = ["#ff2f92", "#3ddc84", "#3f7dff", "#ffb703", "#a78bfa", "#f97316", "#22d3ee", "#f43f5e"];
+const MYROUTE_CARD_H = 56; // 1カード分の高さ(px)。スワイプの1コマ分＝この高さ
 
 // ---------- time / geo helpers ----------
 function effectiveNow() {
@@ -639,7 +652,8 @@ function renderMap(root, date, min) {
   );
   root.appendChild(toolbar);
 
-  renderRouteBanner(root);
+  if (mapState.singleRoute) renderRouteBanner(root);
+  else if (ui.mapMode === "myroute") renderMyRouteBanner(root, date, min);
 
   const mapDiv = el("div", { id: "map-view" });
   root.appendChild(mapDiv);
@@ -893,55 +907,210 @@ function drawMapLayer(date, min) {
   }
 }
 
-function walkTimeIcon(minutes) {
-  return L.divIcon({
-    className: "",
-    html: `<div style="display:inline-block;width:max-content;background:#0f9c8c;color:#fff;font-weight:700;font-size:11px;font-family:'IBM Plex Mono',ui-monospace,monospace;padding:3px 8px;border-radius:20px;border:2px solid #14131a;box-shadow:0 2px 6px rgba(0,0,0,.5);white-space:nowrap;transform:translate(-50%,-50%)">🚶 ${minutes}分</div>`,
-    iconSize: [0, 0],
-    iconAnchor: [0, 0],
+// ルート線の始点・終点マーカー。始点=丸いリング、終点=雫形のピンで形から見分けられるようにする
+function endpointIcon(kind, color) {
+  return kind === "start"
+    ? L.divIcon({
+        className: "route-endpoint start",
+        html: `<span style="--dot-color:${color}"></span>`,
+        iconSize: [14, 14],
+        iconAnchor: [7, 7],
+      })
+    : L.divIcon({
+        className: "route-endpoint end",
+        html: `<span style="--dot-color:${color}"></span>`,
+        iconSize: [20, 20],
+        iconAnchor: [10, 19],
+      });
+}
+
+// 現在時刻（シミュレーション込み）を基準に、マイタイムテーブルでまだ終了していない移動区間を
+// すべて求める（直前の（終了済み最後の）お気に入り→次のお気に入り→その次…と連なる区間の配列）
+function computeMyRouteSegments(date, min) {
+  const favs = [...store.state.favorites]
+    .map((key) => store.state.performances.find((p) => perfKey(p) === key))
+    .filter((p) => p && p.date === date)
+    .sort((a, b) => a.startMin - b.startMin);
+  if (!favs.length) return { message: "本日のお気に入りが登録されていません" };
+
+  const upcoming = favs.filter((p) => p.startMin > min);
+  if (!upcoming.length) return { message: "本日のお気に入り予定はすべて終了しました" };
+
+  const prevList = favs.filter((p) => p.startMin <= min);
+  const prev = prevList.length ? prevList[prevList.length - 1] : null;
+
+  const segments = [];
+  let fromId = prev ? prev.venueId : null; // null = 最初の区間のみ「現在地から」
+  upcoming.forEach((p) => {
+    segments.push({ fromId, toId: p.venueId, toPerf: p });
+    fromId = p.venueId;
+  });
+  return { segments };
+}
+
+// 区間ごとの座標・徒歩時間・ラベルをLeaflet非依存で計算する（地図描画・カード表示の両方から使う）
+function myRouteSegmentDetails(segments) {
+  return segments.map((seg) => {
+    const to = store.venueById(seg.toId);
+    let from = null;
+    let coords = null;
+    let hasRoute = false;
+    let walkMin = null;
+    if (seg.fromId) {
+      from = store.venueById(seg.fromId);
+      const route = store.routeBetween(seg.fromId, seg.toId);
+      if (route && route.poly) {
+        coords = decodePolyline(route.poly);
+        walkMin = route.durMin;
+        hasRoute = true;
+      } else {
+        coords = [[from.lat, from.lng], [to.lat, to.lng]];
+        walkMin = store.walkMinutes(seg.fromId, seg.toId);
+      }
+    } else {
+      from = effectiveGeo();
+      if (from) coords = [[from.lat, from.lng], [to.lat, to.lng]];
+    }
+    if (walkMin == null && coords) {
+      const last = coords[coords.length - 1];
+      walkMin = estimateWalkMin(coords[0][0], coords[0][1], last[0], last[1]);
+    }
+    const fromLabel = seg.fromId ? (from ? `${from.stageNo}. ${from.name}` : "") : from ? "現在地" : "現在地（未取得）";
+    let legText;
+    if (!coords) legText = "現在地が未取得です";
+    else if (hasRoute) legText = `🚶約${walkMin}分`;
+    else legText = `📏約${walkMin}分（概算）`;
+    return { seg, to, from, coords, hasRoute, walkMin, fromLabel, legText };
   });
 }
 
+// マイルートモード: 区間ごとに色分けして地図に描く。カルーセルのスクロールと連動できるよう、
+// ハイライト適用・地図フォーカスの関数をmapStateに残しておく（フルre-renderせずに更新するため）
 function drawMyRoute(layer, date, min) {
-  const favs = [...store.state.favorites]
-    .map((key) => store.state.performances.find((p) => perfKey(p) === key))
-    .filter((p) => p && p.date === date && p.endMin > min)
-    .sort((a, b) => a.startMin - b.startMin);
-  if (!favs.length) return;
+  const { segments } = computeMyRouteSegments(date, min);
+  if (!segments || !segments.length) {
+    mapState.myRouteSegInfo = null;
+    mapState.myRouteApplyHighlight = null;
+    mapState.myRouteFocusMap = null;
+    return;
+  }
+  myRouteIndex = Math.max(0, Math.min(myRouteIndex, segments.length - 1));
+  const details = myRouteSegmentDetails(segments);
 
-  const geo = effectiveGeo();
-  const points = [];
-  if (geo) points.push({ lat: geo.lat, lng: geo.lng, id: null });
-  favs.forEach((p) => {
-    const v = store.venueById(p.venueId);
-    if (v) points.push({ lat: v.lat, lng: v.lng, id: v.id });
+  const segInfo = details.map((d, i) => {
+    const color = ROUTE_COLORS[i % ROUTE_COLORS.length];
+    let halo = null;
+    let line = null;
+    let startMarker = null;
+    let endMarker = null;
+    if (d.coords) {
+      const dash = d.hasRoute ? null : "7 9";
+      halo = L.polyline(d.coords, { color: "#ffffff", weight: 7, opacity: 0.85, dashArray: dash }).addTo(layer);
+      line = L.polyline(d.coords, { color, weight: 4, opacity: 0.85, dashArray: dash }).addTo(layer);
+      startMarker = L.marker(d.coords[0], { icon: endpointIcon("start", color), interactive: false, zIndexOffset: 1000 }).addTo(layer);
+      endMarker = L.marker(d.coords[d.coords.length - 1], { icon: endpointIcon("end", color), interactive: false, zIndexOffset: 1000 }).addTo(layer);
+    }
+    return { ...d, halo, line, startMarker, endMarker };
   });
 
-  for (let i = 0; i < points.length - 1; i++) {
-    const a = points[i];
-    const b = points[i + 1];
-    let latlngs = [[a.lat, a.lng], [b.lat, b.lng]];
-    let walkMin = null;
-    if (a.id && b.id) {
-      const route = store.routeBetween(a.id, b.id);
-      if (route && route.poly) {
-        latlngs = decodePolyline(route.poly);
-        walkMin = route.durMin;
-      } else {
-        walkMin = store.walkMinutes(a.id, b.id);
-      }
+  // フォーカス中の区間だけ太く・不透明に、他は細く・薄くして「今どの線か」を一目で分かるようにする
+  const applyHighlight = (idx) => {
+    segInfo.forEach((s, i) => {
+      if (!s.line) return;
+      const focused = i === idx;
+      s.halo.setStyle({ weight: focused ? 9 : 7, opacity: focused ? 0.95 : 0.85 });
+      s.line.setStyle({ weight: focused ? 5 : 4, opacity: focused ? 1 : 0.85 });
+      s.startMarker.setOpacity(focused ? 1 : 0.6);
+      s.endMarker.setOpacity(focused ? 1 : 0.6);
+      if (focused) s.line.bringToFront();
+    });
+  };
+  const focusMap = (idx) => {
+    const s = segInfo[idx];
+    if (s && s.line) mapState.instance.fitBounds(s.line.getBounds(), { padding: [56, 90] });
+  };
+
+  mapState.myRouteSegInfo = segInfo;
+  mapState.myRouteApplyHighlight = applyHighlight;
+  mapState.myRouteFocusMap = focusMap;
+  applyHighlight(myRouteIndex);
+  focusMap(myRouteIndex);
+}
+
+// マイルートのバナー: カードを上下スワイプ（スクロールスナップ）で1件ずつ切り替えると、
+// 対応する地図上の線が連動してハイライトされる。スクロール中はフルre-renderせず
+// mapState経由でLeafletの見た目だけ直接更新する（じゃないと毎スクロールで地図が作り直されてしまう）
+function renderMyRouteBanner(root, date, min) {
+  const { message, segments } = computeMyRouteSegments(date, min);
+  if (message) {
+    const banner = el("div", { class: "route-banner" });
+    banner.appendChild(
+      el("div", { class: "route-banner-head" }, [
+        el("div", { class: "route-banner-title" }, "🎟️ マイルート"),
+        el(
+          "button",
+          { class: "modal-close", style: "position:static", onclick: () => { ui.mapMode = "normal"; render(); } },
+          "✕"
+        ),
+      ])
+    );
+    banner.appendChild(el("div", { class: "sub-note", style: "margin:0" }, message));
+    root.appendChild(banner);
+    return;
+  }
+
+  myRouteIndex = Math.max(0, Math.min(myRouteIndex, segments.length - 1));
+  const details = myRouteSegmentDetails(segments);
+  const counter = el("span", { class: "myroute-counter" }, `${myRouteIndex + 1} / ${segments.length}`);
+
+  const cards = details.map((d) => {
+    const gUrl = d.coords
+      ? `https://www.google.com/maps/dir/?api=1&origin=${d.coords[0][0]},${d.coords[0][1]}&destination=${d.to.lat},${d.to.lng}&travelmode=walking`
+      : null;
+    return el("div", { class: "myroute-card" }, [
+      el("div", { class: "myroute-main" }, [
+        el("div", { class: "myroute-route" }, `${d.fromLabel} → ${d.to.stageNo}. ${d.to.name}`),
+        el("div", { class: "myroute-sub" }, `${d.legText}　次: ${d.seg.toPerf.start} ${d.seg.toPerf.name}`),
+      ]),
+      gUrl ? el("a", { class: "myroute-g", href: gUrl, target: "_blank", rel: "noopener", title: "Googleで開く" }, "↗") : null,
+    ]);
+  });
+  const carousel = el("div", { class: "myroute-carousel" }, cards);
+
+  const goTo = (idx) => {
+    const clamped = Math.max(0, Math.min(segments.length - 1, idx));
+    carousel.scrollTo({ top: clamped * MYROUTE_CARD_H, behavior: "smooth" });
+  };
+
+  let settleTimer = null;
+  carousel.addEventListener("scroll", () => {
+    const idx = Math.max(0, Math.min(segments.length - 1, Math.round(carousel.scrollTop / MYROUTE_CARD_H)));
+    if (idx !== myRouteIndex) {
+      myRouteIndex = idx;
+      mapState.myRouteApplyHighlight?.(idx);
+      counter.textContent = `${idx + 1} / ${segments.length}`;
     }
-    if (walkMin == null) walkMin = estimateWalkMin(a.lat, a.lng, b.lat, b.lng);
-    const isFirst = a.id === null;
-    L.polyline(latlngs, { color: "#0f9c8c", weight: 5, opacity: 0.95, dashArray: isFirst ? "2 8" : null, lineCap: "round" }).addTo(layer);
-    const midIdx = Math.floor(latlngs.length / 2);
-    const mid = latlngs.length > 2 ? latlngs[midIdx] : [(a.lat + b.lat) / 2, (a.lng + b.lng) / 2];
-    L.marker(mid, { icon: walkTimeIcon(walkMin), zIndexOffset: 300, interactive: false }).addTo(layer);
-  }
-  if (points.length) {
-    const first = points[0];
-    L.circleMarker([first.lat, first.lng], { radius: 9, color: "#0f9c8c", weight: 4, fillOpacity: 0 }).addTo(layer);
-  }
+    // 地図の視点合わせはスクロールが落ち着いてから（スワイプ中に何度も動くと酔うため）
+    clearTimeout(settleTimer);
+    settleTimer = setTimeout(() => mapState.myRouteFocusMap?.(myRouteIndex), 150);
+  });
+
+  const banner = el("div", { class: "route-banner myroute-banner" }, [
+    el("button", { class: "myroute-nav", onclick: () => goTo(myRouteIndex - 1) }, "▲"),
+    el("div", { class: "myroute-carousel-wrap" }, carousel),
+    el("button", { class: "myroute-nav", onclick: () => goTo(myRouteIndex + 1) }, "▼"),
+    el("div", { class: "route-banner-btns" }, [
+      counter,
+      el(
+        "button",
+        { class: "modal-close", style: "position:static", onclick: () => { ui.mapMode = "normal"; render(); } },
+        "✕"
+      ),
+    ]),
+  ]);
+  root.appendChild(banner);
+
+  requestAnimationFrame(() => { carousel.scrollTop = myRouteIndex * MYROUTE_CARD_H; });
 }
 
 // ---------- Tab: マイタイムテーブル ----------
