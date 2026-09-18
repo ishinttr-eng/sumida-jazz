@@ -313,6 +313,8 @@ function renderArtists(root, date, min) {
   dayTabs.append(mkDayTab("all", "すべて"), ...DAYS.map((d) => mkDayTab(d, DAY_LABELS[d])));
   root.appendChild(dayTabs);
 
+  const listContainer = el("div", {});
+
   const filterRow = el("div", { class: "filter-row" });
   const searchInput = el("input", {
     class: "search-input",
@@ -320,8 +322,10 @@ function renderArtists(root, date, min) {
     placeholder: "出演者名・かなで検索",
     value: ui.artistsSearch,
     oninput: debounce((e) => {
+      // ここでfull render()すると<input>ごと作り直されてしまい、入力中にフォーカスが
+      // 外れる（1文字打つたびに再フォーカスが必要になる）ため、リスト部分だけ更新する
       ui.artistsSearch = e.target.value;
-      render();
+      renderArtistsList(listContainer, date, min);
     }, 200),
   });
   const venueSelect = el("select", {
@@ -351,6 +355,13 @@ function renderArtists(root, date, min) {
   if (genres.length) filterRow.append(genreSelect);
   root.appendChild(filterRow);
 
+  root.appendChild(listContainer);
+  renderArtistsList(listContainer, date, min);
+}
+
+function renderArtistsList(container, date, min) {
+  container.innerHTML = "";
+
   const q = normalize(ui.artistsSearch);
   let list = store.state.performances.filter((p) => {
     if (ui.artistsDay !== "all" && p.date !== ui.artistsDay) return false;
@@ -361,7 +372,7 @@ function renderArtists(root, date, min) {
   });
 
   if (!list.length) {
-    root.appendChild(el("div", { class: "empty-state" }, [el("span", { class: "emoji" }, "🔍"), el("div", {}, "該当する出演者が見つかりません")]));
+    container.appendChild(el("div", { class: "empty-state" }, [el("span", { class: "emoji" }, "🔍"), el("div", {}, "該当する出演者が見つかりません")]));
     return;
   }
 
@@ -389,12 +400,12 @@ function renderArtists(root, date, min) {
     return group;
   };
 
-  activeVenues.forEach((v) => root.appendChild(renderVenueGroup(v)));
+  activeVenues.forEach((v) => container.appendChild(renderVenueGroup(v)));
 
   if (finishedVenues.length) {
     const wrap = el("div", {});
     finishedVenues.forEach((v) => wrap.appendChild(renderVenueGroup(v)));
-    root.appendChild(finishedDetails({ screen: "artists", id: "fin" }, `🏁 終了したステージ（${finishedVenues.length}）`, wrap));
+    container.appendChild(finishedDetails({ screen: "artists", id: "fin" }, `🏁 終了したステージ（${finishedVenues.length}）`, wrap));
   }
 }
 
