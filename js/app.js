@@ -461,6 +461,7 @@ function openDetailModal(p) {
     mapBtn.addEventListener("click", () => {
       close();
       activeTab = "map";
+      mapState.selectedVenueId = venue.id;
       render();
       focusMapOnVenue(venue);
     });
@@ -741,6 +742,11 @@ function selectMapSearchResult(v) {
 }
 
 function focusMapOnVenue(venue) {
+  // mapState.center/zoomも更新しておく。タブ切替直後はrequestAnimationFrame内で
+  // initOrUpdateMap()がこの値を使って再度setViewするため、ここを更新しないと
+  // 下記のsetViewがその後の再アタッチ処理で上書きされて元の表示位置に戻ってしまう
+  mapState.center = L.latLng(venue.lat, venue.lng);
+  mapState.zoom = 18;
   if (mapState.instance) {
     mapState.instance.setView([venue.lat, venue.lng], 18, { animate: true });
   }
