@@ -637,20 +637,28 @@ function renderMap(root, date, min) {
   root.appendChild(el("h1", { class: "screen-title" }, "🗺️ マップ"));
 
   const toolbar = el("div", { class: "map-toolbar" });
-  toolbar.appendChild(
-    el("input", {
-      class: "search-input",
-      type: "search",
-      placeholder: "ステージ番号・会場名で検索",
-      value: ui.mapSearch,
-      onkeydown: (e) => {
-        if (e.key === "Enter") {
-          ui.mapSearch = e.target.value;
-          searchOnMap(ui.mapSearch);
-        }
-      },
-    })
-  );
+  const searchWrap = el("div", { class: "map-search-wrap" });
+  const resultsBox = el("div", { class: "map-search-results" });
+  const searchInput = el("input", {
+    class: "search-input",
+    type: "search",
+    placeholder: "ステージ番号・会場名で検索",
+    value: ui.mapSearch,
+    oninput: (e) => {
+      ui.mapSearch = e.target.value;
+      renderMapSearchResults(resultsBox, ui.mapSearch);
+    },
+    onkeydown: (e) => {
+      if (e.key === "Escape") {
+        e.target.value = "";
+        ui.mapSearch = "";
+        resultsBox.replaceChildren();
+      }
+    },
+  });
+  searchWrap.append(searchInput, resultsBox);
+  if (ui.mapSearch) renderMapSearchResults(resultsBox, ui.mapSearch);
+  toolbar.appendChild(searchWrap);
   toolbar.appendChild(
     el(
       "button",
@@ -739,13 +747,39 @@ function renderRouteBanner(root) {
   root.appendChild(banner);
 }
 
-function searchOnMap(q) {
-  const nq = normalize(q);
-  if (!nq) return;
-  const venue = store.state.venues.find(
-    (v) => normalize(v.name).includes(nq) || String(v.stageNo) === q.trim()
+// ステージ番号または会場名でマップ上の会場を検索し、候補をリスト表示する
+function renderMapSearchResults(resultsBox, query) {
+  const nq = normalize(query);
+  if (!nq) {
+    resultsBox.replaceChildren();
+    return;
+  }
+  const matches = store.state.venues
+    .filter((v) => String(v.stageNo).includes(nq) || normalize(v.name).includes(nq))
+    .slice(0, 8);
+  resultsBox.replaceChildren(
+    ...(matches.length
+      ? matches.map((v) =>
+          el(
+            "button",
+            { class: "map-search-row", onclick: () => selectMapSearchResult(v) },
+            `${v.stageNo}. ${v.name}`
+          )
+        )
+      : [el("div", { class: "map-search-empty" }, "該当する会場がありません")])
   );
-  if (venue && mapState.instance) focusMapOnVenue(venue);
+}
+
+// 検索結果タップ: その会場にズームし、ピンをハイライトして検索欄・候補は閉じる
+function selectMapSearchResult(v) {
+  mapState.selectedVenueId = v.id;
+  focusMapOnVenue(v);
+  refreshMapMarkers();
+  ui.mapSearch = "";
+  const wrap = document.querySelector(".map-search-wrap");
+  const input = wrap?.querySelector(".search-input");
+  if (input) input.value = "";
+  wrap?.querySelector(".map-search-results")?.replaceChildren();
 }
 
 function focusMapOnVenue(venue) {
@@ -1343,6 +1377,8 @@ function updateChangelogBadge() {
   btn.classList.toggle("has-badge", !!unread);
   btn.classList.toggle("muted", !unread);
 }
+const OFFICIAL_TIMETABLE_URL = "https://sumida-jazz.jp/sj/timetable.html";
+
 function openChangelogModal() {
   const backdrop = el("div", { class: "modal-backdrop", onclick: (e) => { if (e.target === backdrop) backdrop.remove(); } });
   const sheet = el("div", { class: "modal-sheet" });
@@ -1353,7 +1389,16 @@ function openChangelogModal() {
   if (history.length) {
     sheet.appendChild(el("h4", { style: "color:var(--muted);font-size:.78rem;text-transform:uppercase;margin:10px 0 6px" }, "出演者情報の変更"));
     history.forEach((h) => {
-      sheet.appendChild(el("div", { class: "changelog-date" }, h.checkedAt));
+      sheet.appendChild(
+        el("div", { class: "changelog-date-row" }, [
+          el("span", { class: "changelog-date" }, h.checkedAt),
+          el(
+            "a",
+            { class: "changelog-official-link", href: OFFICIAL_TIMETABLE_URL, target: "_blank", rel: "noopener" },
+            "公式サイトで確認 ↗"
+          ),
+        ])
+      );
       (h.items || []).forEach((item) => {
         const tagLabel = { added: "追加", removed: "削除", swap: "交代", modified: "変更" }[item.kind] || item.kind;
         sheet.appendChild(
@@ -1472,15 +1517,8 @@ function openSettingsModal() {
   btnRow.appendChild(
     el(
       "button",
-      {
-        class: "btn",
-        onclick: () => {
-          const url = `${location.origin}${location.pathname}?fav=${encodeURIComponent([...store.state.favorites].join(","))}`;
-          navigator.clipboard?.writeText(url).catch(() => {});
-          alert("共有リンクをコピーしました");
-        },
-      },
-      "🔗 共有リンクをコピー"
+      { class: "btn", onclick: shareFavoritesLink },
+      navigator.share ? "🔗 共有する" : "🔗 共有リンクをコピー"
     )
   );
   btnRow.appendChild(el("button", { class: "btn", onclick: exportFavoritesFile }, "💾 ファイルに書き出す"));
@@ -1522,6 +1560,34 @@ function confirmImport(keys) {
   store.persistFavorites();
   render();
   alert("取り込みました");
+}
+
+function buildShareUrl(keys) {
+  return `${location.origin}${location.pathname}?fav=${encodeURIComponent(keys.join(","))}`;
+}
+
+// お気に入りをnavigator.share（端末の共有シート）で送る。非対応環境ではクリップボードにコピーする
+async function shareFavoritesLink() {
+  const keys = [...store.state.favorites];
+  if (!keys.length) {
+    alert("お気に入りがまだ登録されていません");
+    return;
+  }
+  const url = buildShareUrl(keys);
+  if (navigator.share) {
+    try {
+      await navigator.share({ title: "すみだジャズナビ マイタイムテーブル", url });
+    } catch {
+      // 共有シートのキャンセル等は何もしない
+    }
+    return;
+  }
+  try {
+    await navigator.clipboard.writeText(url);
+    alert("共有リンクをコピーしました");
+  } catch {
+    prompt("このリンクをコピーしてください", url);
+  }
 }
 
 function checkUrlImport() {

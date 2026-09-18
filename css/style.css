@@ -299,7 +299,22 @@ details.finished-group[open] > summary { margin-bottom: 4px; }
 /* ---------- map ---------- */
 #map-view { height: calc(100vh - 210px); min-height: 360px; border-radius: 14px; overflow: hidden; border: 1px solid var(--line); isolation: isolate; }
 .map-toolbar { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
-.map-toolbar .search-input { flex: 1 1 140px; }
+.map-search-wrap { position: relative; flex: 1 1 140px; }
+.map-search-wrap .search-input { width: 100%; }
+.map-search-results {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 60;
+  background: var(--bg-2); border: 1px solid var(--line); border-radius: 10px;
+  box-shadow: var(--shadow); overflow: hidden;
+}
+.map-search-results:empty { display: none; border: none; box-shadow: none; }
+.map-search-row {
+  display: block; width: 100%; text-align: left; padding: 10px 12px;
+  background: none; border: none; border-bottom: 1px solid var(--line);
+  color: var(--ink); font-size: .86rem; cursor: pointer;
+}
+.map-search-row:last-child { border-bottom: none; }
+.map-search-row:hover { background: var(--card); }
+.map-search-empty { padding: 10px 12px; color: var(--muted); font-size: .82rem; }
 .toggle-btn {
   padding: 8px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--card);
   color: var(--muted); cursor: pointer; font-size: .82rem; white-space: nowrap;
@@ -367,6 +382,9 @@ details.finished-group[open] > summary { margin-bottom: 4px; }
 
 /* ---------- changelog ---------- */
 .changelog-date { font-family: var(--font-mono); font-size: .74rem; color: var(--muted); margin: 16px 0 6px; }
+.changelog-date-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin: 16px 0 6px; }
+.changelog-date-row .changelog-date { margin: 0; }
+.changelog-official-link { font-size: .74rem; white-space: nowrap; }
 .changelog-item { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 8px; font-size: .88rem; }
 .changelog-item .tag {
   flex: 0 0 auto; align-self: flex-start; white-space: nowrap; line-height: 1.5;

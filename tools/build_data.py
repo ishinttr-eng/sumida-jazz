@@ -161,6 +161,31 @@ def diff_performances(old_list, new_list):
     for p in removed:
         if p["name"] not in handled_names:
             items.append({"kind": "removed", "text": f"{p['name']} が削除されました"})
+
+    # フィールド単位の変更検出（同一枠・同一名のまま、時刻やジャンル等だけが変わったケース）
+    MODIFIED_FIELDS = [
+        ("end", "終了時刻"),
+        ("genre", "ジャンル"),
+        ("region", "活動地域"),
+        ("awardEntry", "アワードエントリー"),
+    ]
+    for key, np in new_by_key.items():
+        op = old_by_key.get(key)
+        if not op:
+            continue
+        changes = []
+        for field, label in MODIFIED_FIELDS:
+            ov, nv = op.get(field, ""), np.get(field, "")
+            if ov != nv:
+                changes.append(f"{label}: {ov or '（空欄）'} → {nv or '（空欄）'}")
+        if changes:
+            items.append(
+                {
+                    "kind": "modified",
+                    "text": f"{np['name']}（{np['start']}〜）が変更されました: " + " / ".join(changes),
+                }
+            )
+
     return items
 
 
