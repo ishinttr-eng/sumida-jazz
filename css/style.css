@@ -367,8 +367,11 @@ details.finished-group[open] > summary { margin-bottom: 4px; }
 
 /* ---------- changelog ---------- */
 .changelog-date { font-family: var(--font-mono); font-size: .74rem; color: var(--muted); margin: 16px 0 6px; }
-.changelog-item { display: flex; gap: 8px; margin-bottom: 8px; font-size: .88rem; }
-.changelog-item .tag { flex: 0 0 auto; font-size: .7rem; padding: 1px 7px; border-radius: 20px; background: var(--card); border: 1px solid var(--line); color: var(--muted); }
+.changelog-item { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 8px; font-size: .88rem; }
+.changelog-item .tag {
+  flex: 0 0 auto; align-self: flex-start; white-space: nowrap; line-height: 1.5;
+  font-size: .7rem; padding: 1px 7px; border-radius: 20px; background: var(--card); border: 1px solid var(--line); color: var(--muted);
+}
 .changelog-item .tag.added { color: var(--ok); border-color: var(--ok); }
 .changelog-item .tag.removed { color: var(--ng); border-color: var(--ng); }
 .changelog-item .tag.swap, .changelog-item .tag.modified { color: var(--warn); border-color: var(--warn); }

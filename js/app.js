@@ -1561,8 +1561,12 @@ document.addEventListener("visibilitychange", () => {
 async function currentSwVersion() {
   if (!("caches" in window)) return null;
   try {
-    const key = (await caches.keys()).find((k) => k.startsWith("sjz-"));
-    return key ? key.slice("sjz-".length) : null;
+    // 新旧のキャッシュが一時的に共存することがある（新SWのinstall直後〜旧SWのactivate削除まで）ため、
+    // 見つかった中で一番新しい（数値が大きい）ものを採用する
+    const keys = (await caches.keys()).filter((k) => k.startsWith("sjz-"));
+    if (!keys.length) return null;
+    keys.sort((a, b) => (parseInt(b.slice(5), 10) || 0) - (parseInt(a.slice(5), 10) || 0));
+    return keys[0].slice("sjz-".length);
   } catch {
     return null;
   }
@@ -1582,6 +1586,11 @@ async function updateHeaderInfo() {
     `確認: ${d.getMonth() + 1}/${d.getDate()} ${d.getHours()}:${String(d.getMinutes()).padStart(2, "0")}時点` +
     (ver ? ` / ${ver}` : "");
   el2.textContent = text;
+}
+
+// 新しいService Workerが有効化されてページの制御を引き継いだら、ヘッダーのバージョン表示を追従させる
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.addEventListener("controllerchange", () => updateHeaderInfo());
 }
 
 // ---------- init ----------
