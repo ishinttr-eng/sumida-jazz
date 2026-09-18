@@ -42,7 +42,16 @@ const mapState = {
   myRouteSegInfo: null,
   myRouteApplyHighlight: null,
   myRouteFocusMap: null,
+  selectedVenueId: null,
 };
+
+// 選択中の会場ピンの色を即座に反映する（地図タブを表示中なら再描画、そうでなければ何もしない）
+function refreshMapMarkers() {
+  if (mapState.instance) {
+    const { date, min } = curDateMin();
+    drawMapLayer(date, min);
+  }
+}
 let weatherData = null;
 let geoWatchStarted = false;
 let myRouteIndex = 0; // マイルートでフォーカス中の区間（カードのスワイプで移動）
@@ -512,9 +521,18 @@ function openVenueModal(venueId, day) {
   if (!venue) return;
   const state = { day: day && venue.days.includes(day) ? day : venue.days[0] || DAYS[0], from: "here" };
 
+  mapState.selectedVenueId = venue.id;
+  refreshMapMarkers();
+
   const backdrop = el("div", { class: "modal-backdrop", onclick: (e) => { if (e.target === backdrop) close(); } });
   const sheet = el("div", { class: "modal-sheet" });
-  const close = () => backdrop.remove();
+  const close = () => {
+    backdrop.remove();
+    if (mapState.selectedVenueId === venue.id) {
+      mapState.selectedVenueId = null;
+      refreshMapMarkers();
+    }
+  };
 
   function redraw() {
     sheet.innerHTML = "";
@@ -865,8 +883,10 @@ function drawMapLayer(date, min) {
 
   store.state.venues.forEach((v) => {
     const finished = isVenueFinished(store.state.performances, v.id, null, date, min);
+    const isSelected = mapState.selectedVenueId === v.id;
     const marker = L.marker([v.lat, v.lng], {
-      icon: venueDivIcon(v.stageNo, "#39e0c9", finished),
+      icon: venueDivIcon(v.stageNo, isSelected ? "#ffb020" : "#39e0c9", finished),
+      zIndexOffset: isSelected ? 500 : 0,
     }).addTo(layer);
     // ポップアップは挟まず、タップで直接その日の会場詳細（タイムテーブル）を開く
     marker.on("click", () => openVenueModal(v.id, date));
