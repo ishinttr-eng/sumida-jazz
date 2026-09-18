@@ -593,10 +593,11 @@ function openVenueModal(venueId, day) {
         "🗺 地図で見る"
       )
     );
-    if (fromLat != null) {
-      const gmaps = `https://www.google.com/maps/dir/?api=1&origin=${fromLat},${fromLng}&destination=${venue.lat},${venue.lng}&travelmode=walking`;
-      btnRow.appendChild(el("a", { class: "btn", href: gmaps, target: "_blank", rel: "noopener" }, "ここへ行く"));
-    }
+    const gmaps =
+      fromLat != null
+        ? `https://www.google.com/maps/dir/?api=1&origin=${fromLat},${fromLng}&destination=${venue.lat},${venue.lng}&travelmode=walking`
+        : `https://www.google.com/maps/dir/?api=1&destination=${venue.lat},${venue.lng}&travelmode=walking`;
+    btnRow.appendChild(el("a", { class: "btn", href: gmaps, target: "_blank", rel: "noopener" }, "ここへ行く"));
     sheet.appendChild(btnRow);
 
     const list = el("div", { class: "modal-section" });
@@ -867,17 +868,8 @@ function drawMapLayer(date, min) {
     const marker = L.marker([v.lat, v.lng], {
       icon: venueDivIcon(v.stageNo, "#39e0c9", finished),
     }).addTo(layer);
-    let popupHtml = `<b>${v.stageNo}. ${v.name}</b>`;
-    popupHtml += `<br><button data-tt="${v.id}" style="margin-top:6px">📅 会場の詳細を見る</button>`;
-    const gmaps = `https://www.google.com/maps/dir/?api=1&destination=${v.lat},${v.lng}&travelmode=walking`;
-    popupHtml += `<br><a href="${gmaps}" target="_blank" rel="noopener">Googleマップで徒歩ナビ</a>`;
-    marker.bindPopup(popupHtml);
-    marker.on("popupopen", () => {
-      const ttBtn = document.querySelector(`[data-tt="${v.id}"]`);
-      if (ttBtn) ttBtn.addEventListener("click", () => {
-        openVenueModal(v.id, date);
-      });
-    });
+    // ポップアップは挟まず、タップで直接その日の会場詳細（タイムテーブル）を開く
+    marker.on("click", () => openVenueModal(v.id, date));
   });
 
   (store.state.tieup.stages || []).forEach((s) => {
