@@ -48,6 +48,7 @@ body {
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   overscroll-behavior-y: none;
+  overflow-x: hidden; /* 子要素が僅かにはみ出しても画面全体が横スクロールしないようにする保険 */
 }
 html.font-large body { font-size: 17px; }
 button, input, select { font: inherit; color: inherit; }
@@ -260,9 +261,10 @@ details.finished-group[open] > summary { margin-bottom: 4px; }
 .route-banner {
   background: var(--card); border: 1px solid var(--line); border-radius: 10px;
   padding: 12px 14px; margin-bottom: 10px; display: flex; flex-direction: column; gap: 6px;
+  max-width: 100%; box-sizing: border-box;
 }
 .route-banner-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
-.route-banner-title { font-weight: 700; font-size: .92rem; }
+.route-banner-title { font-weight: 700; font-size: .92rem; min-width: 0; overflow-wrap: break-word; }
 
 /* ルート線の始点・終点マーカー: 始点=丸いリング、終点=雫形のピンで形から見分ける */
 .route-endpoint span { display: block; box-shadow: 0 1px 4px rgba(0,0,0,.5); }
@@ -337,8 +339,10 @@ details.finished-group[open] > summary { margin-bottom: 4px; }
 }
 
 /* ---------- my timetable schedule grid ---------- */
-.schedule-wrap { overflow-x: hidden; }
-.schedule-wrap.scrollable { overflow-x: auto; }
+/* overflow-xだけ指定するとoverflow-yが既定のvisibleのままになり、CSSの仕様上overflow-xが
+   実質autoへ変換されてしまう（＝横スクロールバーが出てしまう）ため、必ず両方明示する */
+.schedule-wrap { overflow-x: hidden; overflow-y: visible; max-width: 100%; }
+.schedule-wrap.scrollable { overflow-x: auto; overflow-y: visible; }
 .schedule-grid { position: relative; }
 .sched-col {
   position: absolute; top: 0;
