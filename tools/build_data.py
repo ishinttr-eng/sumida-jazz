@@ -18,6 +18,7 @@
     data/checked.json
     data/changes.json  (差分がある回のみ履歴追記)
 """
+import html as html_lib
 import json
 import re
 import sys
@@ -60,14 +61,38 @@ VENUE_ORDER = [
     "TATEKAWA・安兵衛",
     "飲食特設ステージ",
 ]
-VENUE_ID_BY_NAME = {name: f"S-{i+1:02d}" for i, name in enumerate(VENUE_ORDER)}
 
-# 会場名の一部に「10月17日」「10月18日」等が続く見出しパターンを想定。
-# 実際のHTML構造に合わせて調整すること（現状はざっくりテキスト抽出ベース）。
-STAGE_HEADING_RE = re.compile(r"\[(\d+)\]\s*(.+?)\s*[-–]\s*(10月\d+日)")
-TIME_LINE_RE = re.compile(r"(\d{1,2}:\d{2})\s*[-–~〜]\s*(\d{1,2}:\d{2})\s*[|｜]\s*(.+)")
 
-DAY_MAP = {"10月17日": "2026-10-17", "10月18日": "2026-10-18"}
+def normalize_venue_name(s: str) -> str:
+    """全角/半角スペースの入り方の揺れ（主に【】の直前直後）を吸収する。
+    それ以外の内部スペース（例: "Platinum PLANET"）はそのまま保持する。"""
+    s = s.strip()
+    s = re.sub(r"[ 　]+(?=[【】])", "", s)
+    s = re.sub(r"(?<=[【】])[ 　]+", "", s)
+    return s
+
+
+VENUE_ID_BY_NAME = {normalize_venue_name(name): f"S-{i+1:02d}" for i, name in enumerate(VENUE_ORDER)}
+
+# 実際のマークアップ（2026-09時点）:
+#   <div class="stage" id="plsNNN">
+#     <h2 class="place"><strong>[1]　やおきんステージ（錦糸公園）</strong></h2>
+#     <p class="date sat">17日(土)</p>
+#     <ul><li><span class="time">9:50-10:00</span> オープニング</li>...</ul>
+#     <p class="date sun">18日(日)</p>
+#     <ul>...</ul>
+#   </div>
+# 出演者名がリンク（<a>）で囲まれているケースがあるため、タグを剥がした上で
+# 「開始-終了 名前」の1行としてパースする（tagを愚直に改行へ変換すると<a>の内側だけ
+# 別行に分離されてしまい、時刻と名前が引き離されるので採らない）。
+STAGE_SPLIT_RE = re.compile(r'<div class="stage" id="(pls\d+)">')
+HEADING_RE = re.compile(r'<h2 class="place"><strong>\s*\[(\d+)\]\s*(.+?)\s*</strong></h2>', re.S)
+DATE_BLOCK_RE = re.compile(r'<p class="date (sat|sun)">.*?</p>\s*<ul>(.*?)</ul>', re.S)
+LI_RE = re.compile(r"<li>(.*?)</li>", re.S)
+TAG_RE = re.compile(r"<[^>]+>")
+TIME_LINE_RE = re.compile(r"^(\d{1,2}:\d{2})\s*[-–~〜]\s*(\d{1,2}:\d{2})\s*(.+)$", re.S)
+
+CLASS_DATE_MAP = {"sat": "2026-10-17", "sun": "2026-10-18"}
 
 
 def load_manual_coords():
@@ -81,58 +106,79 @@ def load_manual_coords():
         return {}
 
 
-def parse_timetable(html: str):
-    """生HTMLをざっくりテキスト化してステージ見出し・出演枠行をパースする。
-    実際のマークアップに応じて BeautifulSoup 等でのDOMベース抽出に置き換えるのが望ましい。
-    """
-    text = re.sub(r"<[^>]+>", "\n", html)
-    lines = [l.strip() for l in text.splitlines() if l.strip()]
+def pad_time(t: str) -> str:
+    """公式サイトは "9:50" のようにゼロ埋めしない表記なので "09:50" に揃える。
+    startを文字列比較でソートしている箇所があるため必須。"""
+    h, m = t.split(":")
+    return f"{int(h):02d}:{m}"
 
+
+def resolve_venue_id(venue_name_raw: str):
+    key = normalize_venue_name(venue_name_raw)
+    venue_id = VENUE_ID_BY_NAME.get(key)
+    if venue_id is not None:
+        return venue_id
+    # 完全一致しない場合は部分一致でフォールバック
+    for name, vid in VENUE_ID_BY_NAME.items():
+        if name in key or key in name:
+            return vid
+    return None
+
+
+def parse_timetable(html: str):
     performances = []
-    current_venue_id = None
-    current_date = None
     pid = 0
     order_counter = {}
 
-    for line in lines:
-        m = STAGE_HEADING_RE.search(line)
-        if m:
-            venue_name_raw = m.group(2).strip()
-            venue_id = VENUE_ID_BY_NAME.get(venue_name_raw)
-            if venue_id is None:
-                # 完全一致しない場合は部分一致でフォールバック
-                for name, vid in VENUE_ID_BY_NAME.items():
-                    if name in venue_name_raw or venue_name_raw in name:
-                        venue_id = vid
-                        break
-            current_venue_id = venue_id
-            current_date = DAY_MAP.get(m.group(3))
+    stage_starts = list(STAGE_SPLIT_RE.finditer(html))
+    for i, sm in enumerate(stage_starts):
+        block_start = sm.end()
+        block_end = stage_starts[i + 1].start() if i + 1 < len(stage_starts) else len(html)
+        block = html[block_start:block_end]
+
+        heading = HEADING_RE.search(block)
+        if not heading:
+            continue
+        venue_name_raw = html_lib.unescape(heading.group(2))
+        venue_id = resolve_venue_id(venue_name_raw)
+        if venue_id is None:
+            print(f"[build_data] 会場名が一致しませんでした: {venue_name_raw!r}（VENUE_ORDERを確認してください）", file=sys.stderr)
             continue
 
-        m = TIME_LINE_RE.match(line)
-        if m and current_venue_id and current_date:
-            start, end, name = m.groups()
-            name = name.strip()
-            pid += 1
-            key = (current_venue_id, current_date, name)
-            order_counter[key] = order_counter.get(key, 0) + 1
-            performances.append(
-                {
-                    "id": f"p-{pid:04d}",
-                    "name": name,
-                    "kana": "",
-                    "venueId": current_venue_id,
-                    "date": current_date,
-                    "start": start,
-                    "end": end,
-                    "genre": "",
-                    "region": "",
-                    "intro": "",
-                    "awardEntry": "",
-                    "isU25": False,
-                    "order": order_counter[key],
-                }
-            )
+        for date_m in DATE_BLOCK_RE.finditer(block):
+            day_class, ul_html = date_m.groups()
+            current_date = CLASS_DATE_MAP.get(day_class)
+            if not current_date:
+                continue
+
+            for li_m in LI_RE.finditer(ul_html):
+                text = html_lib.unescape(TAG_RE.sub("", li_m.group(1))).strip()
+                tm = TIME_LINE_RE.match(text)
+                if not tm:
+                    continue
+                start, end, name = tm.groups()
+                start, end = pad_time(start), pad_time(end)
+                name = name.strip()
+                pid += 1
+                key = (venue_id, current_date, name)
+                order_counter[key] = order_counter.get(key, 0) + 1
+                performances.append(
+                    {
+                        "id": f"p-{pid:04d}",
+                        "name": name,
+                        "kana": "",
+                        "venueId": venue_id,
+                        "date": current_date,
+                        "start": start,
+                        "end": end,
+                        "genre": "",
+                        "region": "",
+                        "intro": "",
+                        "awardEntry": "",
+                        "isU25": False,
+                        "order": order_counter[key],
+                    }
+                )
     return performances
 
 
@@ -198,7 +244,7 @@ def main():
     performances = parse_timetable(html)
 
     if not performances:
-        print("[build_data] 出演情報を1件も抽出できませんでした。STAGE_HEADING_RE / TIME_LINE_RE を見直してください。", file=sys.stderr)
+        print("[build_data] 出演情報を1件も抽出できませんでした。STAGE_SPLIT_RE / HEADING_RE / DATE_BLOCK_RE / TIME_LINE_RE を見直してください。", file=sys.stderr)
         sys.exit(1)
 
     old_perf_path = DATA / "performances.json"
