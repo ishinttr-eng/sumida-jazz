@@ -1,1 +1,37 @@
-{ "history": [] }
+{
+  "history": [
+    {
+      "checkedAt": "2026-09-19T10:32:55.294424+09:00",
+      "items": [
+        {
+          "kind": "swap",
+          "text": "La rosa azul → La  rosa  azul（16:00〜）"
+        },
+        {
+          "kind": "swap",
+          "text": "NEON'S COCKTAIL → NEON’S COCKTAIL（14:20〜）"
+        },
+        {
+          "kind": "swap",
+          "text": "Vln Q → Vln Q👀（14:00〜）"
+        },
+        {
+          "kind": "swap",
+          "text": "BOJ Brasilian Organ Jazz → BOJ　Brasilian Organ Jazz（11:00〜）"
+        },
+        {
+          "kind": "added",
+          "text": "ケンハモ★ミュージック!!　大人のケンハモ が追加されました"
+        },
+        {
+          "kind": "removed",
+          "text": "ケンハモ★ミュージック!! 大人のケンハモ が削除されました"
+        },
+        {
+          "kind": "removed",
+          "text": "アイオケ が削除されました"
+        }
+      ]
+    }
+  ]
+}
