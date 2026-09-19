@@ -300,7 +300,10 @@ details.finished-group[open] > summary { margin-bottom: 4px; }
 .route-banner-btns { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
 
 /* ---------- map ---------- */
-#map-view { height: calc(100vh - 210px); min-height: 360px; border-radius: 14px; overflow: hidden; border: 1px solid var(--line); isolation: isolate; }
+/* heightはJS(fitMapHeight)が実際の残り高さを計算して毎回インラインで上書きする。
+   min-heightをここで大きくすると、狭い画面でJSが計算した小さめの高さより
+   min-heightが優先されてしまい、タブバーへ食い込む原因になるためJS側の下限と揃える。 */
+#map-view { height: calc(100vh - 210px); min-height: 200px; border-radius: 14px; overflow: hidden; border: 1px solid var(--line); isolation: isolate; }
 .map-toolbar { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
 .map-search-wrap { position: relative; flex: 1 1 140px; }
 .map-search-wrap .search-input { width: 100%; }

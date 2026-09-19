@@ -649,7 +649,36 @@ function renderMap(root, date, min) {
   const mapDiv = el("div", { id: "map-view" });
   root.appendChild(mapDiv);
 
-  requestAnimationFrame(() => initOrUpdateMap(mapDiv, date, min));
+  ensureMapResizeListener();
+  requestAnimationFrame(() => {
+    fitMapHeight(mapDiv);
+    initOrUpdateMap(mapDiv, date, min);
+  });
+}
+
+// マップの高さはCSSの固定計算値(calc(100vh - Npx))だと、マイルートの区間パネルのように
+// ツールバーとマップの間に高さが可変なバナーが挟まるケースを想定できず、
+// マップの下端が固定タブバーの下に潜り込んだり、逆に検索エリアが画面外に押し出されたりする。
+// そのため実際にDOMへ配置された後の残り高さを毎回測って明示的にセットする。
+function fitMapHeight(mapDiv) {
+  const top = mapDiv.getBoundingClientRect().top;
+  const tabbar = document.getElementById("tabbar");
+  const tabbarH = tabbar ? tabbar.getBoundingClientRect().height : 0;
+  const available = window.innerHeight - top - tabbarH - 12;
+  // 極端に縦が狭い画面（横向き等）では280pxだと逆にタブバーへ食い込むため、
+  // 最低保証は控えめにして「タブバーに被らない」を優先する
+  mapDiv.style.height = `${Math.max(200, Math.round(available))}px`;
+  mapState.instance?.invalidateSize();
+}
+
+let mapResizeBound = false;
+function ensureMapResizeListener() {
+  if (mapResizeBound) return;
+  mapResizeBound = true;
+  window.addEventListener("resize", () => {
+    const mapDiv = document.getElementById("map-view");
+    if (mapDiv) fitMapHeight(mapDiv);
+  });
 }
 
 // 会場詳細モーダルから「地図で見る」で指定された、現在地または特定会場→会場の単一区間ルート
