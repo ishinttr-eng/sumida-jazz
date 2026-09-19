@@ -73,7 +73,9 @@ a { color: var(--route); }
   top: 0;
   z-index: 40;
 }
-.brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-family: var(--font-display); }
+/* min-width:0がないとフレックスアイテムとしての最小幅が中身のテキスト全体の幅になり、
+   狭い画面でヘッダー全体がはみ出す（.brand-subのellipsisも効かなくなる）ため必須 */
+.brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-family: var(--font-display); min-width: 0; overflow: hidden; }
 .brand-mark { font-size: 1.3rem; }
 .brand-text { display: flex; flex-direction: column; line-height: 1.2; min-width: 0; }
 .brand-name { font-size: 1rem; letter-spacing: .01em; white-space: nowrap; }
@@ -408,6 +410,3 @@ details.finished-group[open] > summary { margin-bottom: 4px; }
 
 footer.data-footer { text-align: center; color: var(--muted); font-size: .72rem; padding: 20px 0 4px; }
 
-@media (max-width: 420px) {
-  .brand-text { display: none; }
-}
