@@ -22,6 +22,7 @@ import html as html_lib
 import json
 import re
 import sys
+import unicodedata
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 
@@ -182,22 +183,37 @@ def parse_timetable(html: str):
     return performances
 
 
-def diff_performances(old_list, new_list):
-    def key(p):
-        return (p["id"], p["date"])
+QUOTE_TRANSLATION = str.maketrans({
+    "‘": "'", "’": "'", "ʼ": "'", "`": "'",
+    "“": '"', "”": '"',
+})
 
-    old_by_key = {(p["venueId"], p["date"], p["start"], p["name"]): p for p in old_list}
-    new_by_key = {(p["venueId"], p["date"], p["start"], p["name"]): p for p in new_list}
+
+def normalize_for_diff(name: str) -> str:
+    """表記ゆれ（全角/半角、スペースの数・全角スペース混在、引用符の字形違い等）を
+    差分として誤検出しないための比較用正規化。表示用のテキストには使わない。"""
+    s = unicodedata.normalize("NFKC", name)
+    s = s.translate(QUOTE_TRANSLATION)
+    s = re.sub(r"\s+", " ", s).strip()
+    return s
+
+
+def diff_performances(old_list, new_list):
+    def nkey(p):
+        return (p["venueId"], p["date"], p["start"], normalize_for_diff(p["name"]))
+
+    old_by_key = {nkey(p): p for p in old_list}
+    new_by_key = {nkey(p): p for p in new_list}
     added = [p for k, p in new_by_key.items() if k not in old_by_key]
     removed = [p for k, p in old_by_key.items() if k not in new_by_key]
     items = []
-    # ざっくり: 同一枠(venueId+date+start)で名前だけ変わっていれば「交代」扱い
+    # ざっくり: 同一枠(venueId+date+start)で名前（表記ゆれ除く）が変わっていれば「交代」扱い
     old_slots = {(p["venueId"], p["date"], p["start"]): p for p in old_list}
     new_slots = {(p["venueId"], p["date"], p["start"]): p for p in new_list}
     handled_names = set()
     for slot, np in new_slots.items():
         op = old_slots.get(slot)
-        if op and op["name"] != np["name"]:
+        if op and normalize_for_diff(op["name"]) != normalize_for_diff(np["name"]):
             items.append({"kind": "swap", "text": f"{op['name']} → {np['name']}（{slot[2]}〜）"})
             handled_names.add(np["name"])
             handled_names.add(op["name"])
