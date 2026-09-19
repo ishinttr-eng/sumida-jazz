@@ -10,6 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      actions: write
     steps:
       - uses: actions/checkout@v4
 
@@ -32,7 +33,19 @@ jobs:
           git add data/venues.json data/performances.json data/checked.json data/changes.json
           if git diff --cached --quiet; then
             echo "no changes"
+            echo "changed=false" >> "$GITHUB_ENV"
           else
             git commit -m "chore: update festival data ($(date -u +%Y-%m-%dT%H:%M:%SZ))"
             git push
+            echo "changed=true" >> "$GITHUB_ENV"
           fi
+
+      # このジョブのpushはデフォルトのGITHUB_TOKENで行われるため、GitHub側の仕様で
+      # deploy-pages.ymlのon:pushトリガーが発火しない（GITHUB_TOKENによるイベントは
+      # 他のワークフローを起動しないループ防止仕様）。そのため差分があった時だけ明示的に
+      # workflow_dispatchで蹴る。
+      - name: Trigger deploy
+        if: env.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run deploy-pages.yml --repo "${{ github.repository }}"
