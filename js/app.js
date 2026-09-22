@@ -861,7 +861,7 @@ function initOrUpdateMap(mapDiv, date, min) {
     );
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19,
-      attribution: "&copy; OpenStreetMap contributors",
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a>',
     }).addTo(map);
     map.on("moveend", () => {
       mapState.center = map.getCenter();
@@ -1568,6 +1568,54 @@ function openSettingsModal() {
   btnRow.appendChild(el("button", { class: "btn", onclick: () => importInput.click() }, "📂 ファイルから読み込む"));
   shareSection.append(btnRow, importInput);
   sheet.appendChild(shareSection);
+
+  // このアプリについて & 免責事項
+  const aboutSection = el("div", { class: "modal-section about-section" });
+  aboutSection.appendChild(el("h4", {}, "このアプリについて・免責事項"));
+  aboutSection.appendChild(
+    el("div", { class: "disclaimer-box" }, [
+      el("p", {}, "本アプリは有志による非公式ファンアプリです。すみだストリートジャズフェスティバル実行委員会および関係団体とは一切関係ありません。"),
+      el("p", {}, [
+        "最新・正確な情報については必ず ",
+        el("a", { href: "https://sumida-jazz.jp/sj/", target: "_blank", rel: "noopener" }, "公式サイト（sumida-jazz.jp）"),
+        " をご確認ください。本アプリに関するお問い合わせを公式運営事務局へ行うことはご遠慮ください。"
+      ])
+    ])
+  );
+  sheet.appendChild(aboutSection);
+
+  // オープンソース & データクレジット
+  const creditSection = el("div", { class: "modal-section credit-section" });
+  creditSection.appendChild(el("h4", {}, "クレジット・ライセンス"));
+  const creditList = el("ul", { class: "credits-list" }, [
+    el("li", {}, [
+      el("span", { class: "credit-label" }, "地図データ: "),
+      el("a", { href: "https://www.openstreetmap.org/copyright", target: "_blank", rel: "noopener" }, "OpenStreetMap contributors"),
+      el("span", { class: "credit-lic" }, " (ODbL)")
+    ]),
+    el("li", {}, [
+      el("span", { class: "credit-label" }, "マップエンジン: "),
+      el("a", { href: "https://leafletjs.com/", target: "_blank", rel: "noopener" }, "Leaflet"),
+      el("span", { class: "credit-lic" }, " (BSD 2-Clause)")
+    ]),
+    el("li", {}, [
+      el("span", { class: "credit-label" }, "天気データ: "),
+      el("a", { href: "https://open-meteo.com/", target: "_blank", rel: "noopener" }, "Weather data by Open-Meteo.com"),
+      el("span", { class: "credit-lic" }, " (CC BY 4.0)")
+    ]),
+    el("li", {}, [
+      el("span", { class: "credit-label" }, "徒歩ルート: "),
+      el("a", { href: "http://project-osrm.org/", target: "_blank", rel: "noopener" }, "OSRM"),
+      " via ",
+      el("a", { href: "https://routing.openstreetmap.de/", target: "_blank", rel: "noopener" }, "FOSSGIS e.V.")
+    ]),
+    el("li", {}, [
+      el("span", { class: "credit-label" }, "ソースコード: "),
+      el("span", {}, "MIT License")
+    ])
+  ]);
+  creditSection.appendChild(creditList);
+  sheet.appendChild(creditSection);
 
   backdrop.appendChild(sheet);
   $modalRoot.appendChild(backdrop);

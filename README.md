@@ -36,7 +36,25 @@ tools/         開発用（公開ディレクトリからは除外）
 - 公式サイトの情報は開催直前まで変動するため、`tools/build_data.py` とGitHub Actionsで自動追従する運用を想定（要: GitHub Pages公開・Actions有効化）。
 - HTMLマークアップの変化には `tools/build_data.py` 内の見出し・時刻パターンの正規表現が追従できていない可能性がある。差分検出が動かなくなった場合は `tools/raw/timetable.html` を取得し直してパターンを見直すこと。
 
+## 免責事項
+
+- 本アプリは有志による**非公式ファンアプリ**です。すみだストリートジャズフェスティバル実行委員会および関係団体とは一切関係ありません。
+- 出演者、演奏スケジュール、会場等の最新・正確な情報は必ず [公式サイト（https://sumida-jazz.jp/sj/）](https://sumida-jazz.jp/sj/) をご確認ください。
+- 本アプリの利用・情報によるいかなる損害についても制作者は責任を負いません。また、本アプリに関する問い合わせを公式運営事務局へ行うことはご遠慮ください。
+
 ## 個人データの扱い
 
-お気に入り・感想メモ・評価・スタンプラリーの達成状況はすべて端末のlocalStorageにのみ保存され、外部には送信されない。
-# sumida-jazz
+お気に入り・感想メモ・評価・スタンプラリーの達成状況はすべて端末のlocalStorageにのみ保存され、外部には送信されません。
+
+## クレジット・謝辞
+
+- **地図**: [OpenStreetMap](https://www.openstreetmap.org/copyright) contributors (ODbL)
+- **マップライブラリ**: [Leaflet](https://leafletjs.com/) (BSD 2-Clause License)
+- **天気データ**: [Open-Meteo](https://open-meteo.com/) (CC BY 4.0)
+- **徒歩ルート計算**: [OSRM](http://project-osrm.org/) via [FOSSGIS e.V.](https://routing.openstreetmap.de/)
+- **イベント情報**: [すみだストリートジャズフェスティバル公式サイト](https://sumida-jazz.jp/sj/)
+
+## ライセンス
+
+本プロジェクトのソースコードは [MIT License](LICENSE) の下で公開されています。
+
