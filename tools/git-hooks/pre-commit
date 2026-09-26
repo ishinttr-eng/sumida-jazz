@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# js/app.js・js/store.js・js/util.js・css/style.css・index.html を変更したのに
+# sw.jsのVERSIONを上げ忘れるミスが繰り返し発生したため、機械的に検知するガード。
+# 意図的にスキップしたい場合は `git commit --no-verify`。
+set -euo pipefail
+
+UI_FILES_PATTERN='^(js/(app|store|util)\.js|css/style\.css|index\.html)$'
+
+changed=$(git diff --cached --name-only)
+
+if ! echo "$changed" | grep -qE "$UI_FILES_PATTERN"; then
+  exit 0
+fi
+
+if ! echo "$changed" | grep -qx "sw.js"; then
+  echo "❌ UI/ロジックのファイルを変更していますが sw.js の VERSION を更新していません。" >&2
+  echo "   見た目・ロジックの変更は必ず sw.js の VERSION を上げてから commit してください。" >&2
+  echo "   意図的にスキップする場合は: git commit --no-verify" >&2
+  exit 1
+fi
+
+if ! git diff --cached -- sw.js | grep -qE '^[+-][[:space:]]*const VERSION ='; then
+  echo "❌ sw.js は変更されていますが VERSION の行自体は変わっていません。" >&2
+  echo "   UI・ロジックの変更なら VERSION を上げてから commit してください。" >&2
+  echo "   意図的にスキップする場合は: git commit --no-verify" >&2
+  exit 1
+fi
+
+exit 0

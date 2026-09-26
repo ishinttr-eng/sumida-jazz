@@ -119,39 +119,37 @@ document.querySelectorAll(".tab-btn").forEach((btn) => {
 });
 
 // ---------- weather badge ----------
+// Open-Meteoの無料予報は開催日の16日前を切るまで該当時刻のデータがそもそも存在しない
+// （fetchWeather自体がHTTP 400で失敗しweatherDataがnullのままになる）。値が無い間も
+// バッジ・予報欄自体は消さず「-」で表示しておく（何も出ないと「壊れているのか、まだ
+// 無いだけなのか」が見分けられないため）。
 function weatherBadgeFor(dateStr, startMin) {
-  if (!weatherData) return null;
   const hour = Math.floor(startMin / 60);
   const key = `${dateStr}T${String(hour).padStart(2, "0")}:00`;
-  const w = weatherData[key];
-  if (!w) return null;
-  return el("span", { class: "badge weather" }, `${store.weatherIcon(w.code)} ${Math.round(w.temp)}° ${w.pop}%`);
+  const w = weatherData ? weatherData[key] : null;
+  const text = w ? `${store.weatherIcon(w.code)} ${Math.round(w.temp)}° ${w.pop}%` : "- -° -%";
+  return el("span", { class: "badge weather" }, text);
 }
 
 // 会場詳細モーダル用: その日の開催時間帯（10〜20時）の天気予報を時間ごとに並べる。
 // 全会場が徒歩圏内で気象モデルの解像度でも差が出ないため、地点はWEATHER_LAT/LNGの単一点を共用する。
 const FESTIVAL_HOURS = [10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
 function venueWeatherStrip(dateStr) {
-  if (!weatherData) return null;
-  const chips = [];
-  FESTIVAL_HOURS.forEach((h) => {
-    const key = `${dateStr}T${String(h).padStart(2, "0")}:00`;
-    const w = weatherData[key];
-    if (!w) return;
-    chips.push(
-      el("div", { class: "weather-chip" }, [
-        el("div", { class: "hour" }, `${h}時`),
-        el("div", { class: "icon" }, store.weatherIcon(w.code)),
-        el("div", { class: "temp" }, `${Math.round(w.temp)}°`),
-        el("div", { class: "pop" }, `💧${w.pop}%`),
-      ])
-    );
-  });
-  if (!chips.length) return null;
   const section = el("div", { class: "modal-section" });
   section.appendChild(el("h4", {}, "天気予報"));
   const strip = el("div", { class: "weather-strip" });
-  chips.forEach((c) => strip.appendChild(c));
+  FESTIVAL_HOURS.forEach((h) => {
+    const key = `${dateStr}T${String(h).padStart(2, "0")}:00`;
+    const w = weatherData ? weatherData[key] : null;
+    strip.appendChild(
+      el("div", { class: "weather-chip" }, [
+        el("div", { class: "hour" }, `${h}時`),
+        el("div", { class: "icon" }, w ? store.weatherIcon(w.code) : "-"),
+        el("div", { class: "temp" }, w ? `${Math.round(w.temp)}°` : "-°"),
+        el("div", { class: "pop" }, w ? `💧${w.pop}%` : "-%"),
+      ])
+    );
+  });
   section.appendChild(strip);
   return section;
 }
@@ -548,8 +546,7 @@ function openVenueModal(venueId, day) {
     });
     sheet.appendChild(dayTabs);
 
-    const weatherStrip = venueWeatherStrip(state.day);
-    if (weatherStrip) sheet.appendChild(weatherStrip);
+    sheet.appendChild(venueWeatherStrip(state.day));
 
     const fromRow = el("div", { class: "modal-section", style: "display:flex;gap:10px;align-items:center;flex-wrap:wrap" });
     const fromSelect = el("select", {

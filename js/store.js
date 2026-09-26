@@ -134,7 +134,21 @@ export async function fetchWeather() {
   try {
     const url = `https://api.open-meteo.com/v1/forecast?latitude=${WEATHER_LAT}&longitude=${WEATHER_LNG}&hourly=temperature_2m,precipitation_probability,weathercode&timezone=Asia%2FTokyo&start_date=2026-10-17&end_date=2026-10-18`;
     const res = await fetch(url);
-    if (!res.ok) return null;
+    if (!res.ok) {
+      // Open-Meteoの無料予報は開催日の16日前を切るまで該当日のデータが
+      // 存在せずHTTP 400になる（"start_date out of allowed range"等）。
+      // バッジには表示せず(呼び出し側で「-」にフォールバック)、開発時に
+      // 「壊れている」のか「まだ予報が無いだけ」なのか判別できるよう理由だけ出す。
+      let reason = `HTTP ${res.status}`;
+      try {
+        const body = await res.json();
+        if (body?.reason) reason = body.reason;
+      } catch {
+        /* エラーレスポンスがJSONでない場合はHTTPステータスのみ出す */
+      }
+      console.warn(`[weather] 天気予報を取得できませんでした: ${reason}`);
+      return null;
+    }
     const data = await res.json();
     const map = {};
     data.hourly.time.forEach((t, i) => {
@@ -145,7 +159,8 @@ export async function fetchWeather() {
       };
     });
     return map;
-  } catch {
+  } catch (e) {
+    console.warn("[weather] 天気予報の取得に失敗しました:", e);
     return null;
   }
 }
