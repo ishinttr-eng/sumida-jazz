@@ -264,6 +264,16 @@ details.finished-group[open] > summary { margin-bottom: 4px; }
 .modal-section { margin: 14px 0; }
 .modal-section h4 { font-size: .78rem; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 0 0 8px; }
 
+.weather-strip { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; }
+.weather-chip {
+  flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 2px;
+  min-width: 52px; padding: 8px 6px; border-radius: 10px; border: 1px solid var(--line);
+  background: var(--card); font-size: .72rem; color: var(--muted);
+}
+.weather-chip .hour { font-family: var(--font-mono); font-size: .68rem; }
+.weather-chip .icon { font-size: 1.1rem; }
+.weather-chip .temp { color: var(--ink); font-weight: 700; }
+
 .btn {
   padding: 9px 16px; border-radius: 10px; border: 1px solid var(--line); background: var(--card);
   color: var(--ink); cursor: pointer; font-size: .88rem;
