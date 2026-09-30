@@ -27,7 +27,7 @@ const ui = {
   artistsGenre: "",
   mapMode: "normal", // normal | myroute
   mapSearch: "",
-  myttMode: "list", // list | schedule
+  myttMode: null, // list | schedule | null（未指定 = お気に入り会場数から自動選択）
 };
 const finishedOpen = { now: new Set(), artists: new Set(), mytt: new Set() };
 const venueCollapseOpen = new Set();
@@ -1241,26 +1241,31 @@ function renderMyTT(root, date, min, over) {
   root.appendChild(dayTabs);
   const activeDay = ui.myttDay || curDay;
 
+  const dayFavs = favs.filter((p) => p.date === activeDay).sort((a, b) => a.startMin - b.startMin);
+  // 表示モードはユーザーが一度でも明示的にトグルしたらそれを優先し、
+  // 未指定の間だけその日のお気に入り会場数（目安8）から自動選択する
+  const dayVenueCount = new Set(dayFavs.map((p) => p.venueId)).size;
+  const effectiveMyttMode = ui.myttMode ?? (dayVenueCount <= 8 ? "list" : "schedule");
+
   if (!over) {
     const modeRow = el("div", { class: "map-toolbar" });
     modeRow.appendChild(
       el(
         "button",
-        { class: `toggle-btn${ui.myttMode === "list" ? " active" : ""}`, onclick: () => { ui.myttMode = "list"; render(); } },
+        { class: `toggle-btn${effectiveMyttMode === "list" ? " active" : ""}`, onclick: () => { ui.myttMode = "list"; render(); } },
         "リスト"
       )
     );
     modeRow.appendChild(
       el(
         "button",
-        { class: `toggle-btn${ui.myttMode === "schedule" ? " active" : ""}`, onclick: () => { ui.myttMode = "schedule"; render(); } },
+        { class: `toggle-btn${effectiveMyttMode === "schedule" ? " active" : ""}`, onclick: () => { ui.myttMode = "schedule"; render(); } },
         "スケジュール表"
       )
     );
     root.appendChild(modeRow);
   }
 
-  const dayFavs = favs.filter((p) => p.date === activeDay).sort((a, b) => a.startMin - b.startMin);
   if (!dayFavs.length) {
     root.appendChild(el("div", { class: "empty-state" }, [el("span", { class: "emoji" }, "📅"), el("div", {}, "この日のお気に入りはありません")]));
     return;
@@ -1301,7 +1306,7 @@ function renderMyTT(root, date, min, over) {
     root.appendChild(banner);
   });
 
-  if (ui.myttMode === "schedule" && !over) {
+  if (effectiveMyttMode === "schedule" && !over) {
     root.appendChild(renderScheduleGrid(dayFavs, date, min));
   } else {
     const finished = dayFavs.filter((p) => p.date < date || (p.date === date && p.endMin <= min));
@@ -1325,21 +1330,35 @@ function renderMyTT(root, date, min, over) {
   }
 }
 
-// お気に入りの演目カードを、連続する2件の間にそのステージ間の移動時間を挟みながら描画する
+// お気に入りの演目を、移動が不要な区間（時系列で連続して同じ会場が続く区間）ごとの箱にまとめて描画する。
+// 同じ会場でも、間に別会場の演目を挟んで再訪する場合は移動が発生するため別の箱に分ける
+// （例: 会場1→2→2→1の順なら「1」「2（2演目）」「1」の3箱）。
+// 箱内の演目が1件だけでも複数件でも同じ箱＋見出しコンポーネントで描画し、表示の統一感を崩さない。
 function appendPerfCardsWithConnectors(container, list, date, min) {
-  list.forEach((p, i) => {
-    container.appendChild(perfCard(p, { date, min }));
-    if (i < list.length - 1) {
-      const connector = travelConnector(list[i], list[i + 1]);
+  let i = 0;
+  while (i < list.length) {
+    let j = i;
+    while (j + 1 < list.length && list[j + 1].venueId === list[i].venueId) j++;
+
+    const venue = store.venueById(list[i].venueId);
+    const group = el("div", { class: "venue-group" });
+    if (venue) {
+      group.appendChild(el("div", { class: "venue-group-head" }, [el("span", { class: "stageno" }, `#${venue.stageNo}`), venue.name]));
+    }
+    for (let k = i; k <= j; k++) {
+      group.appendChild(perfCard(list[k], { date, min, showVenue: false }));
+    }
+    container.appendChild(group);
+
+    if (j < list.length - 1) {
+      const connector = travelConnector(list[j], list[j + 1]);
       if (connector) container.appendChild(connector);
     }
-  });
+    i = j + 1;
+  }
 }
 
 function travelConnector(a, b) {
-  if (a.venueId === b.venueId) {
-    return el("div", { class: "mytt-connector" }, "同じ会場");
-  }
   const venueA = store.venueById(a.venueId);
   const venueB = store.venueById(b.venueId);
   if (!venueA || !venueB) return null;
