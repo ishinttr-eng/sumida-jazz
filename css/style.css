@@ -212,6 +212,20 @@ a { color: var(--route); }
 .perf-card .venue-name { font-size: .78rem; color: var(--muted); }
 .perf-card .badges { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
 
+/* マイタイムテーブル: 移動を挟まない同一会場区間は、カードごとに枠線を持たせず
+   1つの角丸ボックス＋区切り線＋左端の状態色（演奏中/まもなく開始）で1つの箱に見せる */
+.mytt-venue-box {
+  border: 1px solid var(--line); border-radius: 12px;
+  background: var(--card); box-shadow: var(--shadow); overflow: hidden;
+}
+.mytt-venue-box .perf-card {
+  border: none; border-radius: 0; box-shadow: none; margin-bottom: 0;
+  border-left: 3px solid transparent; border-bottom: 1px solid var(--line);
+}
+.mytt-venue-box .perf-card:last-child { border-bottom: none; }
+.mytt-venue-box .perf-card.now { border-left-color: var(--ok); }
+.mytt-venue-box .perf-card.soon { border-left-color: var(--warn); }
+
 .mytt-connector {
   margin: -2px 0 8px 4px;
   padding-left: 12px;

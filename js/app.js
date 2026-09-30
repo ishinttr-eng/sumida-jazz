@@ -1345,9 +1345,11 @@ function appendPerfCardsWithConnectors(container, list, date, min) {
     if (venue) {
       group.appendChild(el("div", { class: "venue-group-head" }, [el("span", { class: "stageno" }, `#${venue.stageNo}`), venue.name]));
     }
+    const box = el("div", { class: "mytt-venue-box" });
     for (let k = i; k <= j; k++) {
-      group.appendChild(perfCard(list[k], { date, min, showVenue: false }));
+      box.appendChild(perfCard(list[k], { date, min, showVenue: false }));
     }
+    group.appendChild(box);
     container.appendChild(group);
 
     if (j < list.length - 1) {
