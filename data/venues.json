@@ -3,6 +3,7 @@
   "venues": [
     {
       "id": "S-01",
+      "area": "kinshicho",
       "stageNo": 1,
       "name": "やおきんステージ（錦糸公園）",
       "lat": 35.69924,
@@ -12,6 +13,7 @@
     },
     {
       "id": "S-02",
+      "area": "kinshicho",
       "stageNo": 2,
       "name": "すみだトリフォニーホール（大ホール）",
       "lat": 35.69721,
@@ -21,6 +23,7 @@
     },
     {
       "id": "S-03",
+      "area": "kinshicho",
       "stageNo": 3,
       "name": "すみだトリフォニーホール（小ホール）",
       "lat": 35.69721,
@@ -30,6 +33,7 @@
     },
     {
       "id": "S-04",
+      "area": "kinshicho",
       "stageNo": 4,
       "name": "Platinum PLANET",
       "lat": 35.70757,
@@ -39,6 +43,7 @@
     },
     {
       "id": "S-05",
+      "area": "kinshicho",
       "stageNo": 5,
       "name": "押上天祖神社【業平二丁目町会会館】",
       "lat": 35.70816,
@@ -48,6 +53,7 @@
     },
     {
       "id": "S-06",
+      "area": "kinshicho",
       "stageNo": 6,
       "name": "cafe kohana",
       "lat": 35.7041,
@@ -57,6 +63,7 @@
     },
     {
       "id": "S-07",
+      "area": "kinshicho",
       "stageNo": 7,
       "name": "カラコネ",
       "lat": 35.70145,
@@ -66,6 +73,7 @@
     },
     {
       "id": "S-08",
+      "area": "kinshicho",
       "stageNo": 8,
       "name": "LOCO BAR【ロコバー】",
       "lat": 35.7009,
@@ -75,6 +83,7 @@
     },
     {
       "id": "S-09",
+      "area": "kinshicho",
       "stageNo": 9,
       "name": "オリナス広場",
       "lat": 35.70085,
@@ -84,6 +93,7 @@
     },
     {
       "id": "S-10",
+      "area": "kinshicho",
       "stageNo": 10,
       "name": "82 ALE HOUSE【エールハウス】",
       "lat": 35.69746,
@@ -93,6 +103,7 @@
     },
     {
       "id": "S-11",
+      "area": "kinshicho",
       "stageNo": 11,
       "name": "地下鉄出口前 アルカイースト",
       "lat": 35.69749,
@@ -102,6 +113,7 @@
     },
     {
       "id": "S-12",
+      "area": "kinshicho",
       "stageNo": 12,
       "name": "アルカキット前",
       "lat": 35.69737,
@@ -111,6 +123,7 @@
     },
     {
       "id": "S-13",
+      "area": "kinshicho",
       "stageNo": 13,
       "name": "赤いオブジェ アルカセントラル２F",
       "lat": 35.69739,
@@ -120,6 +133,7 @@
     },
     {
       "id": "S-14",
+      "area": "kinshicho",
       "stageNo": 14,
       "name": "みずほ銀行前 アルカセントラル１F",
       "lat": 35.69739,
@@ -129,6 +143,7 @@
     },
     {
       "id": "S-15",
+      "area": "kinshicho",
       "stageNo": 15,
       "name": "東武ホテルレバント東京１Fロビーラウンジ クリスタルムーブメント",
       "lat": 35.69725,
@@ -138,6 +153,7 @@
     },
     {
       "id": "S-16",
+      "area": "kinshicho",
       "stageNo": 16,
       "name": "エントランス広場 アルカウェスト１F",
       "lat": 35.69721,
@@ -147,6 +163,7 @@
     },
     {
       "id": "S-17",
+      "area": "kinshicho",
       "stageNo": 17,
       "name": "大横川親水公園イベント広場",
       "lat": 35.69916,
@@ -156,6 +173,7 @@
     },
     {
       "id": "S-18",
+      "area": "kinshicho",
       "stageNo": 18,
       "name": "テルミナガーデンテラス テルミナ5階",
       "lat": 35.69644,
@@ -165,6 +183,7 @@
     },
     {
       "id": "S-19",
+      "area": "kinshicho",
       "stageNo": 19,
       "name": "JR錦糸町駅南口広場",
       "lat": 35.69631,
@@ -174,6 +193,7 @@
     },
     {
       "id": "S-20",
+      "area": "kinshicho",
       "stageNo": 20,
       "name": "楽天地ビル前",
       "lat": 35.69632,
@@ -183,6 +203,7 @@
     },
     {
       "id": "S-21",
+      "area": "kinshicho",
       "stageNo": 21,
       "name": "タワレコステージ",
       "lat": 35.69632,
@@ -192,6 +213,7 @@
     },
     {
       "id": "S-22",
+      "area": "kinshicho",
       "stageNo": 22,
       "name": "JRAウィンズ錦糸町東館ダービー通り前",
       "lat": 35.69495,
@@ -201,6 +223,7 @@
     },
     {
       "id": "S-23",
+      "area": "kinshicho",
       "stageNo": 23,
       "name": "モクシー東京錦糸町",
       "lat": 35.69351,
@@ -210,6 +233,7 @@
     },
     {
       "id": "S-24",
+      "area": "kinshicho",
       "stageNo": 24,
       "name": "ホテルタバードトーキョー",
       "lat": 35.69465,
@@ -219,6 +243,7 @@
     },
     {
       "id": "S-25",
+      "area": "ryogoku",
       "stageNo": 25,
       "name": "両国駅広小路",
       "lat": 35.696,
@@ -228,6 +253,7 @@
     },
     {
       "id": "S-26",
+      "area": "kinshicho",
       "stageNo": 26,
       "name": "TATEKAWA・安兵衛",
       "lat": 35.6915,
@@ -237,6 +263,7 @@
     },
     {
       "id": "S-27",
+      "area": "kinshicho",
       "stageNo": 27,
       "name": "飲食特設ステージ",
       "lat": 35.69924,

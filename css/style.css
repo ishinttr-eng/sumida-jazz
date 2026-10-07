@@ -351,6 +351,14 @@ details.finished-group[open] > summary { margin-bottom: 4px; }
    min-heightが優先されてしまい、タブバーへ食い込む原因になるためJS側の下限と揃える。 */
 #map-view { height: calc(100vh - 210px); min-height: 200px; border-radius: 14px; overflow: hidden; border: 1px solid var(--line); isolation: isolate; }
 .map-toolbar { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+.map-area-tabs { display: flex; gap: 6px; margin-bottom: 10px; overflow-x: auto; }
+.map-area-tab {
+  flex: 0 0 auto;
+  padding: 7px 14px; border-radius: 20px; border: 1px solid var(--line);
+  background: var(--card); color: var(--muted); cursor: pointer; font-size: .85rem;
+  white-space: nowrap;
+}
+.map-area-tab.active { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); font-weight: 700; }
 .map-search-wrap { position: relative; flex: 1 1 140px; }
 .map-search-wrap .search-input { width: 100%; }
 .map-search-results {

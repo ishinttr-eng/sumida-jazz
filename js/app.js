@@ -26,6 +26,7 @@ const ui = {
   artistsVenue: "",
   artistsGenre: "",
   mapMode: "normal", // normal | myroute
+  mapArea: "kinshicho", // kinshicho | ryogoku（両国駅は錦糸町から西に離れており全体表示だと縦に潰れるため、エリア切替で表示を合わせる）
   mapSearch: "",
   myttMode: null, // list | schedule | null（未指定 = お気に入り会場数から自動選択）
 };
@@ -43,6 +44,12 @@ const mapState = {
   myRouteApplyHighlight: null,
   myRouteFocusMap: null,
   selectedVenueId: null,
+  pendingAreaFit: null, // エリア切替ボタンが押された直後と初回表示だけセットされ、通常のタブ復帰ではfitBoundsしない
+};
+
+const MAP_AREAS = {
+  kinshicho: { label: "錦糸町" },
+  ryogoku: { label: "両国駅" },
 };
 
 // 選択中の会場ピンの色を即座に反映する（地図タブを表示中なら再描画、そうでなければ何もしない）
@@ -671,6 +678,33 @@ function renderMap(root, date, min) {
   );
   root.appendChild(toolbar);
 
+  // 初回表示（まだ地図を操作していない）は選択中エリアにfitBoundsする。
+  // 2回目以降のタブ切替ではmapState.centerがあるため、表示位置を保持する動作を優先する
+  if (!mapState.center && !mapState.pendingAreaFit) {
+    mapState.pendingAreaFit = ui.mapArea;
+  }
+
+  const areaTabs = el("div", { class: "map-area-tabs" });
+  for (const [key, info] of Object.entries(MAP_AREAS)) {
+    areaTabs.appendChild(
+      el(
+        "button",
+        {
+          class: `map-area-tab${ui.mapArea === key ? " active" : ""}`,
+          "data-area": key,
+          onclick: () => {
+            if (ui.mapArea === key) return;
+            ui.mapArea = key;
+            mapState.pendingAreaFit = key;
+            render();
+          },
+        },
+        info.label
+      )
+    );
+  }
+  root.appendChild(areaTabs);
+
   if (mapState.singleRoute) renderRouteBanner(root);
   else if (ui.mapMode === "myroute") renderMyRouteBanner(root, date, min);
 
@@ -810,6 +844,14 @@ function selectMapSearchResult(v) {
 }
 
 function focusMapOnVenue(venue) {
+  // 検索・会場詳細の「地図で見る」等どの導線でも、エリアタブの表示をジャンプ先の会場に合わせる
+  const area = venue.area || "kinshicho";
+  if (ui.mapArea !== area) {
+    ui.mapArea = area;
+    document.querySelectorAll(".map-area-tab").forEach((btn) => {
+      btn.classList.toggle("active", btn.dataset.area === area);
+    });
+  }
   // mapState.center/zoomも更新しておく。タブ切替直後はrequestAnimationFrame内で
   // initOrUpdateMap()がこの値を使って再度setViewするため、ここを更新しないと
   // 下記のsetViewがその後の再アタッチ処理で上書きされて元の表示位置に戻ってしまう
@@ -927,6 +969,20 @@ function initOrUpdateMap(mapDiv, date, min) {
     if (mapState.center) mapState.instance.setView(mapState.center, mapState.zoom);
   }
   drawMapLayer(date, min);
+
+  // ルート表示中は、描画側が既にルートに合わせたfitBoundsをしているので上書きしない
+  if (mapState.pendingAreaFit) {
+    const pending = mapState.pendingAreaFit;
+    mapState.pendingAreaFit = null;
+    if (ui.mapMode !== "myroute" && !mapState.singleRoute) {
+      const areaVenues = store.state.venues.filter((v) => (v.area || "kinshicho") === pending);
+      if (areaVenues.length === 1) {
+        mapState.instance.setView([areaVenues[0].lat, areaVenues[0].lng], 16);
+      } else if (areaVenues.length > 1) {
+        mapState.instance.fitBounds(L.latLngBounds(areaVenues.map((v) => [v.lat, v.lng])), { padding: [32, 32] });
+      }
+    }
+  }
 }
 
 function drawMapLayer(date, min) {
@@ -1026,9 +1082,18 @@ function computeMyRouteSegments(date, min) {
   const segments = [];
   let fromId = prev ? prev.venueId : null; // null = 最初の区間のみ「現在地から」
   upcoming.forEach((p) => {
-    segments.push({ fromId, toId: p.venueId, toPerf: p });
+    // 同じ会場が続く（移動が発生しない）場合は区間を作らず、カルーセルには最初の1件だけ残す
+    if (fromId !== p.venueId) {
+      segments.push({ fromId, toId: p.venueId, toPerf: p, lastPerf: p, count: 1 });
+    } else if (segments.length && segments[segments.length - 1].toId === p.venueId) {
+      // カードの時間表示用に、その会場で最後のお気に入り演目を覚えておく
+      const seg = segments[segments.length - 1];
+      seg.lastPerf = p;
+      seg.count += 1;
+    }
     fromId = p.venueId;
   });
+  if (!segments.length) return { message: "本日の残りのお気に入りはすべて同じ会場のため、移動はありません" };
   return { segments };
 }
 
@@ -1158,7 +1223,7 @@ function renderMyRouteBanner(root, date, min) {
     return el("div", { class: "myroute-card" }, [
       el("div", { class: "myroute-main" }, [
         el("div", { class: "myroute-route" }, `${d.fromLabel} → ${d.to.stageNo}. ${d.to.name}`),
-        el("div", { class: "myroute-sub" }, `${d.legText}　次: ${d.seg.toPerf.start} ${d.seg.toPerf.name}`),
+        el("div", { class: "myroute-sub" }, `${d.legText}　次: ${d.seg.toPerf.start}〜${d.seg.lastPerf.end} ${d.seg.toPerf.name}${d.seg.count > 1 ? ` ほか${d.seg.count - 1}件` : ""}`),
       ]),
       gUrl ? el("a", { class: "myroute-g", href: gUrl, target: "_blank", rel: "noopener", title: "Googleで開く" }, "↗") : null,
     ]);
