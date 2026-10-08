@@ -48,6 +48,9 @@ const mapState = {
   areaFitByUser: false, // pendingAreaFitがエリアタブの明示的な押下によるものか（初回表示の自動フィットと区別する）
 };
 
+// 地図の視点移動（setView/fitBounds）は、プログラムから呼ぶものはすべて { animate: false } にする。
+// Leafletのズームアニメーションは終了処理が250ms後に古い目標位置を適用するため、その間に別の視点移動を
+// 呼ぶと（エリア切替・カード送り・タブ復帰が連続した時など）後から上書きされて経路へ引き戻される。
 const MAP_AREAS = {
   kinshicho: { label: "錦糸町" },
   ryogoku: { label: "両国駅" },
@@ -767,7 +770,7 @@ function drawSingleRoute(layer, spec) {
   L.circleMarker([info.from.lat, info.from.lng], { radius: 8, color: "#fff", weight: 3, fillColor: "#ff2f92", fillOpacity: 1 }).addTo(layer);
   const mid = info.latlngs[Math.floor(info.latlngs.length / 2)];
   L.marker(mid, { icon: walkTimeIcon(info.walkMin, "#ff2f92"), interactive: false, zIndexOffset: 1200 }).addTo(layer);
-  mapState.instance.fitBounds(L.latLngBounds(info.latlngs), { padding: [56, 56] });
+  mapState.instance.fitBounds(L.latLngBounds(info.latlngs), { padding: [56, 56], animate: false });
 }
 
 function renderRouteBanner(root) {
@@ -851,7 +854,7 @@ function focusMapOnVenue(venue) {
   mapState.center = L.latLng(venue.lat, venue.lng);
   mapState.zoom = 18;
   if (mapState.instance) {
-    mapState.instance.setView([venue.lat, venue.lng], 18, { animate: true });
+    mapState.instance.setView([venue.lat, venue.lng], 18, { animate: false });
   }
 }
 
@@ -944,7 +947,7 @@ function initOrUpdateMap(mapDiv, date, min) {
         try {
           const geo = await locateOnce();
           b.textContent = "📍";
-          map.setView([geo.lat, geo.lng], 16);
+          map.setView([geo.lat, geo.lng], 16, { animate: false });
         } catch {
           b.textContent = "❌";
           setTimeout(() => { b.textContent = "📍"; }, 1500);
@@ -959,7 +962,9 @@ function initOrUpdateMap(mapDiv, date, min) {
     // 別のdivへ再アタッチ（タブ切替でDOMが作り直されるため）
     mapDiv.appendChild(mapState.instance.getContainer());
     mapState.instance.invalidateSize();
-    if (mapState.center) mapState.instance.setView(mapState.center, mapState.zoom);
+    // 保持していた表示位置へ戻す。アニメーション付きだと、直後に別の視点移動（エリア切替など）を
+    // 呼んでも、先のズームアニメーションの終了処理が後から古い目標位置を適用して上書きしてしまう
+    if (mapState.center) mapState.instance.setView(mapState.center, mapState.zoom, { animate: false });
   }
   drawMapLayer(date, min);
 
@@ -1176,7 +1181,7 @@ function drawMyRoute(layer, date, min) {
   };
   const focusMap = (idx) => {
     const s = segInfo[idx];
-    if (s && s.line) mapState.instance.fitBounds(s.line.getBounds(), { padding: [56, 90] });
+    if (s && s.line) mapState.instance.fitBounds(s.line.getBounds(), { padding: [56, 90], animate: false });
   };
 
   mapState.myRouteSegInfo = segInfo;

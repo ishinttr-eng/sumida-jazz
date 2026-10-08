@@ -23,6 +23,22 @@
   window.addEventListener("error", (e) => errors.push("error: " + e.message));
   window.addEventListener("unhandledrejection", (e) => errors.push("rejection: " + (e.reason && e.reason.message || e.reason)));
 
+  // Leaflet.Mapの視点変更呼び出しを記録する（失敗時に「誰がいつ地図を動かしたか」を追えるように）
+  window.__mlog = window.__mlog || [];
+  if (window.L && !L.Map.prototype.__monkeyPatched) {
+    L.Map.prototype.__monkeyPatched = true;
+    for (const fn of ["setView", "fitBounds", "panTo", "setZoom", "flyTo", "invalidateSize"]) {
+      const orig = L.Map.prototype[fn];
+      L.Map.prototype[fn] = function (...a) {
+        window.__lmap = this;
+        const caller = (new Error().stack.split("\n")[2] || "").trim().replace(/^at /, "").slice(-60);
+        window.__mlog.push(`${Math.round(performance.now())}ms ${fn}(${fn === "invalidateSize" ? "" : JSON.stringify(a).slice(0, 70)}) <- ${caller}`);
+        if (window.__mlog.length > 40) window.__mlog.shift();
+        return orig.apply(this, a);
+      };
+    }
+  }
+
   const M = (window.__monkey = { seed: SEED, done: false, actions: 0, failures: [], errors, trace: [], counts: {} });
 
   const visible = (el) => {
@@ -45,6 +61,8 @@
     ].join(",");
     return [...document.querySelectorAll(sel)].filter((el) => {
       if (el.closest("a") || el.tagName === "A") return false;
+      // 設定画面は文字サイズ・テーマ・シミュレーション等の永続設定を書き換えてしまうので、閉じる操作以外は触らない
+      if (!el.classList.contains("modal-close") && el.closest(".modal-sheet")?.querySelector(".settings-row")) return false;
       if (el.tagName === "BUTTON" && SAFE_SKIP.test(el.textContent || "")) return false;
       if (el.classList.contains("leaflet-marker-icon") && !el.textContent.trim()) return false;
       return visible(el);
@@ -131,7 +149,17 @@
       await sleep(act.kind === "area" ? 900 : 350);
       const f = check(act);
       if (f.length) {
-        M.failures.push({ at: Math.round(performance.now() - t0), tab: document.querySelector(".tab-btn.active")?.dataset.tab, mode: !!document.querySelector(".myroute-banner"), fails: f, trace: M.trace.slice(-8) });
+        const lm = window.__lmap;
+        M.failures.push({
+          at: Math.round(performance.now() - t0),
+          tab: document.querySelector(".tab-btn.active")?.dataset.tab,
+          mode: !!document.querySelector(".myroute-banner"),
+          area: document.querySelector(".map-area-tab.active")?.dataset.area,
+          view: lm ? { center: [+lm.getCenter().lat.toFixed(4), +lm.getCenter().lng.toFixed(4)], zoom: lm.getZoom() } : null,
+          fails: f,
+          trace: M.trace.slice(-8),
+          mapCalls: window.__mlog.slice(-10),
+        });
         if (M.failures.length >= 15) break;
       }
     }
