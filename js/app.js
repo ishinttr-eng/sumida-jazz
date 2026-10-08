@@ -697,7 +697,7 @@ function renderMap(root, date, min) {
           class: `map-area-tab${ui.mapArea === key ? " active" : ""}`,
           "data-area": key,
           onclick: () => {
-            if (ui.mapArea === key) return;
+            // すでに選択中のエリアを押した時も再フィットする（パンして離れた後に、タップで戻れるようにする）
             ui.mapArea = key;
             mapState.pendingAreaFit = key;
             mapState.areaFitByUser = true;
@@ -1249,6 +1249,9 @@ function renderMyRouteBanner(root, date, min) {
     clearTimeout(settleTimer);
     settleTimer = setTimeout(() => {
       swiped = false;
+      // スワイプ後のスクロール中に画面が作り直された（エリアタブ押下など）場合、この古いカードの
+      // タイマーが新しい画面の経路フォーカスを実行して、移動した地図を引き戻してしまうので発火させない
+      if (!carousel.isConnected) return;
       mapState.myRouteFocusMap?.(myRouteIndex);
     }, 150);
   });
