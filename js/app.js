@@ -45,6 +45,7 @@ const mapState = {
   myRouteFocusMap: null,
   selectedVenueId: null,
   pendingAreaFit: null, // エリア切替ボタンが押された直後と初回表示だけセットされ、通常のタブ復帰ではfitBoundsしない
+  areaFitByUser: false, // pendingAreaFitがエリアタブの明示的な押下によるものか（初回表示の自動フィットと区別する）
 };
 
 const MAP_AREAS = {
@@ -94,6 +95,9 @@ function render() {
   const over = isFestivalOver(date, min);
 
   if (over && (activeTab === "artists" || activeTab === "map")) activeTab = "now";
+
+  // 地図タブだけ画面を「ビューポート高さ固定の縦フレックス」にし、地図に残り高さを持たせる（css/style.cssの.screen-map）
+  document.getElementById("app").classList.toggle("screen-map", activeTab === "map");
 
   if (activeTab === "now") renderNow($main, date, min, over);
   else if (activeTab === "artists") renderArtists($main, date, min);
@@ -696,6 +700,7 @@ function renderMap(root, date, min) {
             if (ui.mapArea === key) return;
             ui.mapArea = key;
             mapState.pendingAreaFit = key;
+            mapState.areaFitByUser = true;
             render();
           },
         },
@@ -713,33 +718,21 @@ function renderMap(root, date, min) {
 
   ensureMapResizeListener();
   requestAnimationFrame(() => {
-    fitMapHeight(mapDiv);
     initOrUpdateMap(mapDiv, date, min);
   });
 }
 
-// マップの高さはCSSの固定計算値(calc(100vh - Npx))だと、マイルートの区間パネルのように
-// ツールバーとマップの間に高さが可変なバナーが挟まるケースを想定できず、
-// マップの下端が固定タブバーの下に潜り込んだり、逆に検索エリアが画面外に押し出されたりする。
-// そのため実際にDOMへ配置された後の残り高さを毎回測って明示的にセットする。
-function fitMapHeight(mapDiv) {
-  const top = mapDiv.getBoundingClientRect().top;
-  const tabbar = document.getElementById("tabbar");
-  const tabbarH = tabbar ? tabbar.getBoundingClientRect().height : 0;
-  const available = window.innerHeight - top - tabbarH - 12;
-  // 極端に縦が狭い画面（横向き等）では280pxだと逆にタブバーへ食い込むため、
-  // 最低保証は控えめにして「タブバーに被らない」を優先する
-  mapDiv.style.height = `${Math.max(200, Math.round(available))}px`;
-  mapState.instance?.invalidateSize();
-}
-
+// マップの高さはJSで測って当てない。地図タブでは#appがビューポート高さ固定の縦フレックスになり、
+// #map-viewが残り高さをflexで受け持つ（css/style.cssの.screen-map）。バナーの高さが変わっても
+// スクロール位置が変わっても、ブラウザが自動で収める。以前はJSで「位置・タブバー高・下パディング」を
+// 足し引きしていたが、スクロール量を考慮し忘れて画面下に余白が出る不具合を繰り返したため廃止した。
+// 画面サイズが変わった時（回転など）だけ、Leafletに地図の表示サイズの再計測を促す。
 let mapResizeBound = false;
 function ensureMapResizeListener() {
   if (mapResizeBound) return;
   mapResizeBound = true;
   window.addEventListener("resize", () => {
-    const mapDiv = document.getElementById("map-view");
-    if (mapDiv) fitMapHeight(mapDiv);
+    mapState.instance?.invalidateSize();
   });
 }
 
@@ -970,11 +963,14 @@ function initOrUpdateMap(mapDiv, date, min) {
   }
   drawMapLayer(date, min);
 
-  // ルート表示中は、描画側が既にルートに合わせたfitBoundsをしているので上書きしない
+  // 初回表示の自動フィットは、ルート表示中なら描画側のルートに合わせたfitBoundsを優先して上書きしない。
+  // ただしエリアタブを明示的に押した時は、ルート表示中でも必ずそのエリアへ移動する（何も起きないように見えるため）
   if (mapState.pendingAreaFit) {
     const pending = mapState.pendingAreaFit;
+    const byUser = mapState.areaFitByUser;
     mapState.pendingAreaFit = null;
-    if (ui.mapMode !== "myroute" && !mapState.singleRoute) {
+    mapState.areaFitByUser = false;
+    if (byUser || (ui.mapMode !== "myroute" && !mapState.singleRoute)) {
       const areaVenues = store.state.venues.filter((v) => (v.area || "kinshicho") === pending);
       if (areaVenues.length === 1) {
         mapState.instance.setView([areaVenues[0].lat, areaVenues[0].lng], 16);
@@ -1236,16 +1232,23 @@ function renderMyRouteBanner(root, date, min) {
   };
 
   let settleTimer = null;
+  let swiped = false; // 表示中のカードが実際に切り替わった時だけtrue。描画直後のscrollTop設定では地図を動かさない
   carousel.addEventListener("scroll", () => {
     const idx = Math.max(0, Math.min(segments.length - 1, Math.round(carousel.scrollTop / MYROUTE_CARD_H)));
     if (idx !== myRouteIndex) {
       myRouteIndex = idx;
       mapState.myRouteApplyHighlight?.(idx);
       counter.textContent = `${idx + 1} / ${segments.length}`;
+      swiped = true;
     }
-    // 地図の視点合わせはスクロールが落ち着いてから（スワイプ中に何度も動くと酔うため）
+    // 地図の視点合わせはスクロールが落ち着いてから（スワイプ中に何度も動くと酔うため）。
+    // 描画直後の復元スクロールでも発火させると、エリアタブで動かした地図が経路へ引き戻されてしまう
+    if (!swiped) return;
     clearTimeout(settleTimer);
-    settleTimer = setTimeout(() => mapState.myRouteFocusMap?.(myRouteIndex), 150);
+    settleTimer = setTimeout(() => {
+      swiped = false;
+      mapState.myRouteFocusMap?.(myRouteIndex);
+    }, 150);
   });
 
   const banner = el("div", { class: "route-banner myroute-banner" }, [
