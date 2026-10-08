@@ -1,6 +1,23 @@
 {
   "history": [
     {
+      "checkedAt": "2026-10-09T03:15:43.731348+09:00",
+      "items": [
+        {
+          "kind": "swap",
+          "text": "BOJ　Brasilian Organ Jazz → ケンハモ★ミュージック!!　大人のケンハモ（11:00〜）"
+        },
+        {
+          "kind": "removed",
+          "text": "Kohei gobanjo trio が削除されました"
+        },
+        {
+          "kind": "removed",
+          "text": "イシタニタイジュTrio feat.MC.Scarf が削除されました"
+        }
+      ]
+    },
+    {
       "checkedAt": "2026-09-21T17:26:46.792209+09:00",
       "items": [
         {
