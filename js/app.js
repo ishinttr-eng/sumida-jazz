@@ -973,9 +973,9 @@ function initOrUpdateMap(mapDiv, date, min) {
     if (byUser || (ui.mapMode !== "myroute" && !mapState.singleRoute)) {
       const areaVenues = store.state.venues.filter((v) => (v.area || "kinshicho") === pending);
       if (areaVenues.length === 1) {
-        mapState.instance.setView([areaVenues[0].lat, areaVenues[0].lng], 16);
+        mapState.instance.setView([areaVenues[0].lat, areaVenues[0].lng], 16, { animate: false });
       } else if (areaVenues.length > 1) {
-        mapState.instance.fitBounds(L.latLngBounds(areaVenues.map((v) => [v.lat, v.lng])), { padding: [32, 32] });
+        mapState.instance.fitBounds(L.latLngBounds(areaVenues.map((v) => [v.lat, v.lng])), { padding: [32, 32], animate: false });
       }
     }
   }
@@ -1183,7 +1183,9 @@ function drawMyRoute(layer, date, min) {
   mapState.myRouteApplyHighlight = applyHighlight;
   mapState.myRouteFocusMap = focusMap;
   applyHighlight(myRouteIndex);
-  focusMap(myRouteIndex);
+  // エリアタブを押した直後は、この後すぐエリアへ移動する。ここで経路へのズームアニメーションを
+  // 始めると、その終了処理が後からエリア移動を上書きして経路へ引き戻してしまう（2回目以降の切替で発生）
+  if (!(mapState.pendingAreaFit && mapState.areaFitByUser)) focusMap(myRouteIndex);
 }
 
 // マイルートのバナー: カードを上下スワイプ（スクロールスナップ）で1件ずつ切り替えると、
