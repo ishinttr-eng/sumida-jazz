@@ -1546,6 +1546,7 @@ function updateChangelogBadge() {
   btn.classList.toggle("has-badge", !!unread);
   btn.classList.toggle("muted", !unread);
 }
+const APP_CHANGELOG_LIMIT = 20;
 const OFFICIAL_TIMETABLE_URL = "https://sumida-jazz.jp/sj/timetable.html";
 
 function openChangelogModal() {
@@ -1579,7 +1580,7 @@ function openChangelogModal() {
     sheet.appendChild(el("p", { style: "color:var(--muted)" }, "出演者情報の変更履歴はまだありません。"));
   }
 
-  const app = store.state.appChangelog?.entries || [];
+  const app = (store.state.appChangelog?.entries || []).slice(0, APP_CHANGELOG_LIMIT);
   if (app.length) {
     sheet.appendChild(el("h4", { style: "color:var(--muted);font-size:.78rem;text-transform:uppercase;margin:18px 0 6px" }, "アプリの更新履歴"));
     let lastDate = null;
