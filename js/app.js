@@ -1516,21 +1516,27 @@ function renderMyTT(root, date, min, over) {
   }
 
   const warnings = computeWarnings(dayFavs);
-  warnings.forEach((w) => {
-    const banner = el(
-      "div",
-      {
-        class: "warn-banner",
-        onclick: () => {
-          activeTab = "map";
-          ui.mapMode = "myroute";
-          render();
-        },
-      },
-      `⚠️ ${w}`
-    );
-    root.appendChild(banner);
-  });
+  // 警告は常時出すと邪魔なので、折りたたみに隠して閉じている間は件数だけ見せる
+  if (warnings.length) {
+    const wrap = el("div", { style: "padding-top:6px" });
+    warnings.forEach((w) => {
+      wrap.appendChild(
+        el(
+          "div",
+          {
+            class: "warn-banner",
+            onclick: () => {
+              activeTab = "map";
+              ui.mapMode = "myroute";
+              render();
+            },
+          },
+          `⚠️ ${w}`
+        )
+      );
+    });
+    root.appendChild(finishedDetails({ screen: "mytt", id: `warn-${activeDay}` }, `⚠️ 時間・移動の警告（${warnings.length}件）`, wrap));
+  }
 
   if (effectiveMyttMode === "schedule" && !over) {
     root.appendChild(renderScheduleGrid(dayFavs, date, min));
