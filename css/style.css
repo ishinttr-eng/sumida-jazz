@@ -7,6 +7,8 @@
   --line: #2a3050;
   --accent: #e6a740;
   --accent-soft: #e6a74022;
+  --clash: #6aa8ff;
+  --clash-soft: #6aa8ff22;
   --route: #4fd8c9;
   --route-soft: #4fd8c920;
   --ok: #4fce93;
@@ -28,6 +30,8 @@
   --line: #dfe3ee;
   --accent: #b3791b;
   --accent-soft: #b3791b18;
+  --clash: #2f6fd0;
+  --clash-soft: #2f6fd01a;
   --route: #0f8a7d;
   --route-soft: #0f8a7d18;
   --ok: #1c7a4f;
@@ -245,6 +249,30 @@ a { color: var(--route); }
   line-height: 1;
 }
 .fav-btn.active { color: var(--accent); }
+/* 同じ出演者の別の枠が登録済み: 星は空のままアクセント色にする */
+.fav-btn.other { color: var(--accent); }
+.perf-card.faved {
+  background: linear-gradient(var(--accent-soft), var(--accent-soft)), var(--card);
+  box-shadow: inset 4px 0 0 var(--accent), var(--shadow);
+}
+.perf-card.now.faved { box-shadow: 0 0 0 1px var(--ok) inset, inset 4px 0 0 var(--accent), var(--shadow); }
+.perf-card.clash { background: linear-gradient(var(--clash-soft), var(--clash-soft)), var(--card); }
+.team-slot.clash { background: linear-gradient(var(--clash-soft), var(--clash-soft)), var(--bg-2); }
+.badge.clash-badge { color: var(--clash); border-color: var(--clash); }
+.team-slot-day { border: 1px solid var(--line); border-radius: 12px; padding: 8px; margin-bottom: 8px; }
+.team-slot-day-head { font-size: .78rem; font-weight: 700; color: var(--muted); margin: 0 2px 6px; }
+.team-slots { display: flex; flex-direction: column; gap: 6px; }
+.team-slot {
+  display: flex; align-items: center; gap: 8px; padding: 8px 10px; border: 1px solid var(--line);
+  border-radius: 10px; background: var(--bg-2);
+}
+.team-slot.faved { background: var(--accent-soft); }
+.team-slot-tag { font-size: .68rem; font-weight: 700; color: var(--accent); margin-left: 4px; }
+.team-slot-tag[hidden] { display: none; }
+.team-slot.current { border-color: var(--accent); }
+.team-slot-body { flex: 1; min-width: 0; }
+.team-slot-time { font-size: .85rem; font-weight: 600; }
+.team-slot-venue { font-size: .78rem; color: var(--muted); }
 
 /* ---------- finished collapsible ---------- */
 details.finished-group {
@@ -252,7 +280,15 @@ details.finished-group {
 }
 details.finished-group > summary {
   cursor: pointer; padding: 10px 0; color: var(--muted); font-size: .85rem; list-style: none;
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
 }
+/* 折りたたみだと分かるよう、右端に開閉の矢印を付ける（開くと下向きに回る） */
+details.finished-group > summary::after {
+  content: ""; flex: none; width: 8px; height: 8px;
+  border-right: 2px solid currentColor; border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg); transition: transform .15s; margin-right: 4px;
+}
+details.finished-group[open] > summary::after { transform: rotate(45deg); }
 details.finished-group > summary::-webkit-details-marker { display: none; }
 details.finished-group[open] > summary { margin-bottom: 4px; }
 

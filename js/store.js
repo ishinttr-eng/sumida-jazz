@@ -68,6 +68,25 @@ export function toggleFavorite(p) {
 export function isFavorite(p) {
   return state.favorites.has(perfKey(p));
 }
+// 同じ出演者(公式ページ、無ければ名前)として扱うキー
+export function teamKey(p) {
+  return p.officialUrl || p.name;
+}
+// この枠と時間が重なる別のお気に入り枠（無ければnull）。同じ日で、枠の時間帯が少しでも重なれば重複とみなす
+export function conflictingFavorite(p) {
+  if (!state.favorites.size || isFavorite(p)) return null;
+  return (
+    state.performances.find(
+      (x) => x.date === p.date && x.startMin < p.endMin && p.startMin < x.endMin && state.favorites.has(perfKey(x))
+    ) || null
+  );
+}
+// この枠自体は未登録だが、同じ出演者の別の枠がお気に入りに入っているか
+export function hasOtherSlotFavorite(p) {
+  if (!state.favorites.size || isFavorite(p)) return false;
+  const k = teamKey(p);
+  return state.performances.some((x) => teamKey(x) === k && state.favorites.has(perfKey(x)));
+}
 
 async function fetchJSON(path) {
   const res = await fetch(path, { cache: "no-cache" });

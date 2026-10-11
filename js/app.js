@@ -12,6 +12,7 @@ import {
   minToHHMM,
   estimateWalkMin,
   isVenueFinished,
+  isPerfFinished,
   isFestivalOver,
   debounce,
 } from "./util.js";
@@ -30,7 +31,7 @@ const ui = {
   mapSearch: "",
   myttMode: null, // list | schedule | null（未指定 = お気に入り会場数から自動選択）
 };
-const finishedOpen = { now: new Set(), artists: new Set(), mytt: new Set() };
+const finishedOpen = { now: new Set(), artists: new Set(), mytt: new Set(), team: new Set() };
 const venueCollapseOpen = new Set();
 
 const mapState = {
@@ -169,6 +170,49 @@ function venueWeatherStrip(dateStr) {
 }
 
 // ---------- performance card ----------
+// ☆=未登録 / ★=この枠を登録済み / アクセント色の☆=同じ出演者の別の枠を登録済み
+// 出演者タブでは、お気に入り済みの別の枠と時間が重なるカードを塗り、どの枠と重なるかを示す（枠の重複を避けるため）
+function applyFavState(btn, p) {
+  const on = store.isFavorite(p);
+  const other = store.hasOtherSlotFavorite(p);
+  btn.classList.toggle("active", on);
+  btn.classList.toggle("other", other);
+  btn.textContent = on ? "★" : "☆";
+  btn.title = other ? "同じ出演者の別の枠がお気に入りに入っています" : "";
+  // お気に入り済みの枠はカード自体も目立たせる（お気に入り一覧では全部が対象なので付けない）
+  const card = btn.closest(".perf-card");
+  card?.classList.toggle("faved", on && activeTab !== "mytt");
+  const clash = activeTab === "artists" && card ? store.conflictingFavorite(p) : null;
+  card?.classList.toggle("clash", !!clash);
+  card?.querySelector(".clash-badge")?.remove();
+  if (clash) {
+    const v = store.venueById(clash.venueId);
+    const badge = el("span", { class: "badge clash-badge" }, `${v ? v.stageNo + ". " : ""}${clash.name}`);
+    (card.querySelector(".badges") || card.querySelector(".body")).appendChild(badge);
+  }
+}
+// 出演枠リストの行に、お気に入り済みの別の枠との時間の重なりを表示する
+function applyRowClash(row, q) {
+  const clash = activeTab === "artists" ? store.conflictingFavorite(q) : null;
+  row.classList.toggle("clash", !!clash);
+  row.querySelector(".clash-badge")?.remove();
+  if (clash) {
+    const v = store.venueById(clash.venueId);
+    row.querySelector(".team-slot-body").appendChild(el("span", { class: "badge clash-badge" }, `${v ? v.stageNo + ". " : ""}${clash.name}`));
+  }
+}
+function refreshFavButtons() {
+  const byKey = new Map(store.state.performances.map((x) => [perfKey(x), x]));
+  document.querySelectorAll(".team-slot[data-pid]").forEach((r) => {
+    const q = byKey.get(r.dataset.pid);
+    if (q) applyRowClash(r, q);
+  });
+  document.querySelectorAll(".fav-btn[data-pid]").forEach((b) => {
+    const p = byKey.get(b.dataset.pid);
+    if (p) applyFavState(b, p);
+  });
+}
+
 function perfCard(p, { date, min, showVenue = true, showDate = false } = {}) {
   const venue = store.venueById(p.venueId);
   const playing = isNowPlaying(p, date, min);
@@ -202,21 +246,26 @@ function perfCard(p, { date, min, showVenue = true, showDate = false } = {}) {
   if (wb) badges.appendChild(wb);
   if (badges.children.length) body.appendChild(badges);
 
-  const favBtn = el(
-    "button",
-    {
-      class: `fav-btn${store.isFavorite(p) ? " active" : ""}`,
-      "aria-label": "お気に入り",
-      onclick: (e) => {
-        e.stopPropagation();
-        store.toggleFavorite(p);
+  const favBtn = el("button", {
+    class: "fav-btn",
+    "data-pid": perfKey(p),
+    "aria-label": "お気に入り",
+    onclick: (e) => {
+      e.stopPropagation();
+      store.toggleFavorite(p);
+      if (activeTab === "artists") {
+        // 出演者タブは☆の見た目が変わるだけなので、全体を再描画せずボタンだけ更新する
+        // （スクロール位置や検索欄のフォーカスを保つ）。同じ出演者の別枠・時間の重なりの表示も合わせて更新する
+        refreshFavButtons();
+      } else {
         render();
-      },
+      }
     },
-    store.isFavorite(p) ? "★" : "☆"
-  );
+  });
+  applyFavState(favBtn, p);
 
   card.append(timeCol, body, favBtn);
+  applyFavState(favBtn, p); // カードに繋がってから、カード側の表示（登録済みの塗り・時間の重なり）を反映する
   return card;
 }
 
@@ -433,10 +482,18 @@ function renderArtistsList(container, date, min) {
   const renderVenueGroup = (v) => {
     const group = el("div", { class: "venue-group" });
     group.appendChild(el("div", { class: "venue-group-head" }, [el("span", { class: "stageno" }, `#${v.stageNo}`), v.name]));
-    byVenue
+    const perfs = byVenue
       .get(v.id)
-      .sort((a, b) => (a.date === b.date ? a.startMin - b.startMin : a.date.localeCompare(b.date)))
-      .forEach((p) => group.appendChild(perfCard(p, { date, min, showVenue: false, showDate: ui.artistsDay === "all" })));
+      .sort((a, b) => (a.date === b.date ? a.startMin - b.startMin : a.date.localeCompare(b.date)));
+    // 会場全体が終了していなければ、終了した枠だけ「終了済み」アコーディオンに移す（会場ごと終了済みの場合は外側のアコーディオンに入る）
+    const done = finishedVenues.includes(v) ? [] : perfs.filter((p) => isPerfFinished(p, date, min));
+    const showDate = ui.artistsDay === "all";
+    perfs.filter((p) => !done.includes(p)).forEach((p) => group.appendChild(perfCard(p, { date, min, showVenue: false, showDate })));
+    if (done.length) {
+      const wrap = el("div", {});
+      done.forEach((p) => wrap.appendChild(perfCard(p, { date, min, showVenue: false, showDate })));
+      group.appendChild(finishedDetails({ screen: "artists", id: `slots-${v.id}` }, `🏁 終了済み（${done.length}）`, wrap));
+    }
     return group;
   };
 
@@ -450,6 +507,78 @@ function renderArtistsList(container, date, min) {
 }
 
 // ---------- detail modal ----------
+// 出演枠リスト。枠ごとにお気に入りへ入れられ、登録済みの枠は背景と「登録済み」の印で分かる。
+// 終了した枠は「終了済み」アコーディオンに移す
+function teamSlotsSection(slots, { currentKey = null, onOpen, onToggle = () => {} }) {
+  const sec = el("div", { class: "modal-section" });
+  sec.appendChild(el("h4", {}, `この出演者の出演枠（${slots.length}）`));
+  const { date: curDate, min: curMin } = curDateMin();
+  const makeBoxes = () => {
+    const boxes = new Map();
+    return {
+      boxes,
+      rowsFor: (d) => {
+        if (!boxes.has(d)) {
+          const rows = el("div", { class: "team-slots" });
+          boxes.set(d, el("div", { class: "team-slot-day" }, [el("div", { class: "team-slot-day-head" }, DAY_LABELS[d] || d), rows]));
+          boxes.get(d).rows = rows;
+        }
+        return boxes.get(d).rows;
+      },
+    };
+  };
+  const upcoming = makeBoxes();
+  const finished = makeBoxes();
+  let finishedCount = 0;
+  slots.forEach((q) => {
+    const v = store.venueById(q.venueId);
+    const star = el("button", {
+      class: "fav-btn",
+      "aria-label": "この枠をお気に入りにする",
+      onclick: (e) => {
+        e.stopPropagation();
+        store.toggleFavorite(q);
+        applyFavState(e.currentTarget, q);
+        markFaved();
+        onToggle();
+      },
+    });
+    applyFavState(star, q);
+    const tag = el("span", { class: "team-slot-tag" }, "★ 登録済み");
+    const markFaved = () => {
+      const on = store.isFavorite(q);
+      row.classList.toggle("faved", on);
+      tag.hidden = !on;
+    };
+    const row = el("div", { class: `team-slot${perfKey(q) === currentKey ? " current" : ""}`, "data-pid": perfKey(q) }, [
+      el("div", { class: "team-slot-body" }, [
+        el("div", { class: "team-slot-time" }, [document.createTextNode(`${fmtRange(q.start, q.end)} `), tag]),
+        el("div", { class: "team-slot-venue" }, v ? `${v.stageNo}. ${v.name}` : ""),
+      ]),
+      star,
+    ]);
+    markFaved();
+    applyRowClash(row, q);
+    if (perfKey(q) !== currentKey) {
+      row.style.cursor = "pointer";
+      row.addEventListener("click", () => onOpen(q));
+    }
+    if (isPerfFinished(q, curDate, curMin)) {
+      finishedCount++;
+      finished.rowsFor(q.date).appendChild(row);
+    } else {
+      upcoming.rowsFor(q.date).appendChild(row);
+    }
+  });
+  upcoming.boxes.forEach((box) => sec.appendChild(box));
+  if (finishedCount) {
+    const wrap = el("div", {});
+    finished.boxes.forEach((box) => wrap.appendChild(box));
+    sec.appendChild(finishedDetails({ screen: "team", id: store.teamKey(slots[0]) }, `🏁 終了済み（${finishedCount}）`, wrap));
+  }
+  return sec;
+}
+
 function openDetailModal(p) {
   const venue = store.venueById(p.venueId);
   const backdrop = el("div", { class: "modal-backdrop", onclick: (e) => { if (e.target === backdrop) close(); } });
@@ -498,10 +627,28 @@ function openDetailModal(p) {
           openDetailModal(p);
         },
       },
-      store.isFavorite(p) ? "★ お気に入り登録済み" : "☆ お気に入りに追加"
+      store.isFavorite(p)
+        ? "★ お気に入り登録済み"
+        : store.hasOtherSlotFavorite(p)
+          ? "☆ この枠もお気に入りに追加（別の枠は登録済み）"
+          : "☆ お気に入りに追加"
     )
   );
   sheet.appendChild(favSection);
+
+  // 同じ出演者が複数回出る場合は、全ての枠を並べて枠ごとにお気に入りへ入れられるようにする
+  const slots = store.state.performances
+    .filter((x) => store.teamKey(x) === store.teamKey(p))
+    .sort((a, b) => a.date.localeCompare(b.date) || a.startMin - b.startMin);
+  if (slots.length > 1) {
+    sheet.appendChild(
+      teamSlotsSection(slots, {
+        currentKey: perfKey(p),
+        onOpen: (q) => { close(); openDetailModal(q); },
+        onToggle: render,
+      })
+    );
+  }
 
   if (venue) {
     const mapBtn = el(
@@ -1171,10 +1318,11 @@ function drawMyRoute(layer, date, min) {
     segInfo.forEach((s, i) => {
       if (!s.line) return;
       const focused = i === idx;
-      s.halo.setStyle({ weight: focused ? 9 : 7, opacity: focused ? 0.95 : 0.85 });
-      s.line.setStyle({ weight: focused ? 5 : 4, opacity: focused ? 1 : 0.85 });
-      s.startMarker.setOpacity(focused ? 1 : 0.6);
-      s.endMarker.setOpacity(focused ? 1 : 0.6);
+      // 選択中のルートを目立たせるため、他のルートは細く薄くする
+      s.halo.setStyle({ weight: focused ? 9 : 5, opacity: focused ? 0.95 : 0.15 });
+      s.line.setStyle({ weight: focused ? 5 : 3, opacity: focused ? 1 : 0.3 });
+      s.startMarker.setOpacity(focused ? 1 : 0.3);
+      s.endMarker.setOpacity(focused ? 1 : 0.3);
       s.timeMarker?.setOpacity(focused ? 1 : 0);
       if (focused) s.line.bringToFront();
     });

@@ -91,6 +91,11 @@ export function isVenueFinished(performances, venueId, date, curDate, curMin) {
   });
 }
 
+// この枠が終了済みか（日付が過去、または当日で終了時刻を過ぎている）
+export function isPerfFinished(p, curDate, curMin) {
+  return p.date < curDate || (p.date === curDate && p.endMin <= curMin);
+}
+
 export function isFestivalOver(curDate, curMin) {
   const lastDay = DAYS[DAYS.length - 1];
   if (curDate > lastDay) return true;
