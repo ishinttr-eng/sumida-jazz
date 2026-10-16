@@ -319,6 +319,12 @@ function finishedDetails(key, label, content) {
   return d;
 }
 
+function resetSimTime() {
+  store.state.settings.simTime = null;
+  store.persistSettings();
+  render();
+}
+
 // ---------- Tab: 演奏中 ----------
 function renderNow(root, date, min, over) {
   if (over) {
@@ -327,7 +333,12 @@ function renderNow(root, date, min, over) {
   }
   root.appendChild(el("h1", { class: "screen-title" }, "🎺 演奏中"));
   if (store.state.settings.simTime) {
-    root.appendChild(el("div", { class: "sub-note" }, `⏱ 時刻シミュレーション中: ${DAY_LABELS[date] || date} ${minToHHMM(min)}`));
+    root.appendChild(
+      el("div", { class: "sub-note" }, [
+        `⏱ 時刻シミュレーション中: ${DAY_LABELS[date] || date} ${minToHHMM(min)} `,
+        el("button", { class: "btn small", type: "button", onclick: resetSimTime }, "リセット"),
+      ])
+    );
   }
   root.appendChild(locationRow());
 
@@ -1800,7 +1811,20 @@ function openSettingsModal() {
       render();
     },
   });
-  simRow.appendChild(simInput);
+  const simReset = el(
+    "button",
+    {
+      class: "btn small",
+      type: "button",
+      onclick: () => {
+        resetSimTime();
+        simInput.value = "";
+      },
+    },
+    "リセット"
+  );
+  const simCtl = el("div", { style: "display:flex;gap:6px;align-items:center" }, [simInput, simReset]);
+  simRow.appendChild(simCtl);
   sheet.appendChild(simRow);
 
   // 現在地シミュレーション
