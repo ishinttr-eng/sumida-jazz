@@ -391,7 +391,7 @@ function renderNow(root, date, min, over) {
 function overPanel() {
   const panel = el("div", { class: "over-panel" });
   panel.append(
-    el("div", { class: "emoji" }, "🎉"),
+    el("div", { class: "emoji" }, "🙏"),
     el("h2", {}, "すみだジャズフェスティバル2026、ありがとうございました"),
     el("p", {}, "素敵な演奏を届けてくださった出演アーティストの皆さん、開催を支えてくださった主催者・運営スタッフの皆さん、本当にお疲れさまでした。たくさんの音楽と楽しい時間をありがとうございました。"),
     el("p", {}, "マイタイムテーブルは、思い出として引き続きご覧いただけます。")
