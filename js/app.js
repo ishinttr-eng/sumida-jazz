@@ -1800,10 +1800,11 @@ function openSettingsModal() {
   sheet.appendChild(fontRow);
 
   // 時刻シミュレーション
-  const simRow = el("div", { class: "settings-row" });
+  const simRow = el("div", { class: "settings-row", style: "flex-wrap:wrap" });
   simRow.appendChild(el("div", {}, [el("div", { class: "label" }, "時刻シミュレーション"), el("div", { class: "desc" }, "開催日前でも当日の見え方を確認できます")]));
   const simInput = el("input", {
     type: "datetime-local",
+    style: "flex:1;min-width:0",
     value: store.state.settings.simTime || "",
     onchange: (e) => {
       store.state.settings.simTime = e.target.value || null;
@@ -1816,6 +1817,7 @@ function openSettingsModal() {
     {
       class: "btn small",
       type: "button",
+      style: "white-space:nowrap;flex:none",
       onclick: () => {
         resetSimTime();
         simInput.value = "";
@@ -1823,7 +1825,7 @@ function openSettingsModal() {
     },
     "リセット"
   );
-  const simCtl = el("div", { style: "display:flex;gap:6px;align-items:center" }, [simInput, simReset]);
+  const simCtl = el("div", { style: "display:flex;gap:6px;align-items:center;width:100%" }, [simInput, simReset]);
   simRow.appendChild(simCtl);
   sheet.appendChild(simRow);
 
