@@ -319,6 +319,13 @@ function finishedDetails(key, label, content) {
   return d;
 }
 
+// 開催日以外（開催前・後の実時刻）も "10/16(金)" 形式に揃える
+function dayLabel(date) {
+  if (DAY_LABELS[date]) return DAY_LABELS[date];
+  const d = new Date(`${date}T00:00:00`);
+  return `${d.getMonth() + 1}/${d.getDate()}(${"日月火水木金土"[d.getDay()]})`;
+}
+
 function resetSimTime() {
   store.state.settings.simTime = null;
   store.persistSettings();
@@ -332,14 +339,12 @@ function renderNow(root, date, min, over) {
     return;
   }
   root.appendChild(el("h1", { class: "screen-title" }, "🎺 演奏中"));
-  if (store.state.settings.simTime) {
-    root.appendChild(
-      el("div", { class: "sub-note" }, [
-        `⏱ 時刻シミュレーション中: ${DAY_LABELS[date] || date} ${minToHHMM(min)} `,
-        el("button", { class: "btn small", type: "button", onclick: resetSimTime }, "リセット"),
-      ])
-    );
-  }
+  root.appendChild(
+    el("div", { class: "sub-note" }, [
+      `⏱ 表示時刻: ${dayLabel(date)} ${minToHHMM(min)} `,
+      store.state.settings.simTime ? el("button", { class: "btn small", type: "button", onclick: resetSimTime }, "リセット") : null,
+    ])
+  );
   root.appendChild(locationRow());
 
   const playing = store.state.performances.filter((p) => isNowPlaying(p, date, min));
